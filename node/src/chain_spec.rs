@@ -157,11 +157,11 @@ fn testnet_genesis(
             owner: get_account_id_from_seed::<sr25519::Public>("Bob"),
             fee_rate: 1,
             assets: vec![
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 100_000_000_000_000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 100000000000000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 100000000000000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 100000000000000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 100000000000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000_000_000_000_000_000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
             ],
         }),
 	}
