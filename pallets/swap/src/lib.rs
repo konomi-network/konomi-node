@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-    decl_event, decl_module, decl_storage, ensure, Parameter,
+    decl_event, decl_module, decl_storage, Parameter,
     StorageMap, StorageValue,
 };
 use sp_runtime::DispatchResult as Result;
@@ -10,19 +10,16 @@ use sp_core::crypto::{UncheckedFrom, UncheckedInto};
 use sp_std::prelude::*;
 use sp_std::{marker::PhantomData, mem, vec::Vec};
 use sp_runtime::traits::{
-    Bounded, Hash, Member, One, AtLeast32BitUnsigned, Zero,
+    Bounded, Hash, AtLeast32BitUnsigned, Zero,
 };
+use pallet_assets as assets;
 
 /// The module's configuration trait.
-pub trait Trait: system::Trait {
+pub trait Trait: assets::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-    /// The units in which we record balances.
-    type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
-    /// The arithmetic type of asset identifier.
-    type AssetId: Parameter + AtLeast32BitUnsigned + Default + Copy;
     /// The exchange address type to make a new paired pool address as AccountId
-    type ExchangeAddress: ExchangeFactory<Self::AssetId, Self::AccountId>;
+    type ExchangeAddress: ExchangeFactory<<Self as assets::Trait>::AssetId, Self::AccountId>;
     /// The global fee rate
     type FeeRate: Parameter + AtLeast32BitUnsigned + Default + Copy;
 }
@@ -30,15 +27,9 @@ pub trait Trait: system::Trait {
 decl_event!(
     pub enum Event<T>
     where <T as system::Trait>::AccountId,
-    <T as Trait>::Balance,
-    <T as Trait>::AssetId {
-        /// Some assets were issued.
-        Issued(AssetId, AccountId, Balance),
-        /// Some assets were transferred.
-        Transferred(AssetId, AccountId, AccountId, Balance),
-        /// Some assets were destroyed.
-        Destroyed(AssetId, AccountId, Balance),
-        /// Assets swapment event
+    <T as assets::Trait>::Balance,
+    <T as assets::Trait>::AssetId {
+        /// Assets swap event
         AssetsSwapped(AccountId, AssetId, Balance, AssetId, Balance),
         /// Adding liquidity event
         /// account, liquidity amount, paired asset_id
@@ -55,42 +46,18 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as Swap
     where
-        u64: core::convert::From<<T as Trait>::AssetId>,
-        u128: core::convert::From<<T as Trait>::Balance>,
-    <T as Trait>::Balance: core::convert::From<u128>
+        u64: core::convert::From<<T as assets::Trait>::AssetId>,
+        u128: core::convert::From<<T as assets::Trait>::Balance>,
+    <T as assets::Trait>::Balance: core::convert::From<u128>
     {
-        /// The next asset identifier up for grabs.
-        NextAssetId get(fn next_asset_id): T::AssetId;
-        /// The total unit supply of an asset.
-        TotalSupply get(fn get_asset_total_supply): map hasher(blake2_128_concat) T::AssetId => T::Balance;
-        /// The number of units of assets held by any given account.
-        Balances get(fn get_asset_balance): map hasher(blake2_128_concat) (T::AssetId, T::AccountId) => T::Balance;
-        /// The default inherent asset in this platform
-        InherentAsset get(fn inherent_asset_id): T::AssetId;
         /// The global fee rate of this platform
         FeeRateGlobal get(fn fee_rate) config(): T::FeeRate;
         /// Total liquidity of each pair pool (InherentAsset and another asset)
         TotalLiquidities get(fn total_liquidity): map hasher(blake2_128_concat) T::AssetId => T::Balance;
         /// The liquidity of each account on some one asset pool
         AccountLiquidities get(fn account_liquidity): map hasher(blake2_128_concat) (T::AssetId, T::AccountId) => T::Balance;
-        /// for test only
-        Owner get(fn owner) config(): T::AccountId;
         /// Accounts of exchanges
         ExchangeAccounts get(fn exchange_account): map hasher(blake2_128_concat) T::AssetId => T::AccountId
-    }
-
-    add_extra_genesis {
-        config(assets): Vec<(T::AccountId, T::Balance)>;
-
-        build(|config: &GenesisConfig<T>| {
-            for asset in config.assets.iter() {
-                let (account, amount) = asset;
-                <Module<T>>::_issue(account.clone(), amount.clone());
-                let to_account = <Owner<T>>::get();
-                let asset_id = <NextAssetId<T>>::get() - 1.into();
-                <Module<T>>::transfer(account.clone(), asset_id, to_account, 50000.into());
-            }
-        })
     }
 
 }
@@ -99,66 +66,13 @@ decl_storage! {
 decl_module! {
     pub struct Module<T: Trait> for enum Call where
         origin: T::Origin,
-        u64: core::convert::From<<T as Trait>::AssetId>,
-        u128: core::convert::From<<T as Trait>::Balance>,
-    <T as Trait>::Balance: core::convert::From<u128>
+        u64: core::convert::From<<T as assets::Trait>::AssetId>,
+        u128: core::convert::From<<T as assets::Trait>::Balance>,
+    <T as assets::Trait>::Balance: core::convert::From<u128>
     {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
-
-        #[weight = 1]
-        fn issue(origin, total: T::Balance) -> Result {
-            let origin = ensure_signed(origin)?;
-
-            let id = Self::next_asset_id();
-            <NextAssetId<T>>::mutate(|id| *id += One::one());
-
-            <Balances<T>>::insert((id, origin.clone()), total);
-            <TotalSupply<T>>::insert(id, total);
-
-            // debug
-            sp_runtime::print("----> asset id, total balance");
-            let idn: u64 = id.into();
-            sp_runtime::print(idn);
-            let b: u128 = <Balances<T>>::get((id, origin.clone())).into();
-            sp_runtime::print(b as u64);
-
-            Self::deposit_event(RawEvent::Issued(id, origin, total));
-
-            Ok(())
-        }
-
-        /// Destroy any assets of `id` owned by `origin`.
-        /// @origin
-        /// @id      Asset id to be destroyed
-        #[weight = 1]
-        fn destroy(origin, id: T::AssetId) -> Result {
-            let origin = ensure_signed(origin)?;
-            let balance = <Balances<T>>::take((id, origin.clone()));
-            ensure!(!balance.is_zero(), "origin balance should be non-zero");
-
-            <TotalSupply<T>>::mutate(id, |total_supply| *total_supply -= balance);
-            Self::deposit_event(RawEvent::Destroyed(id, origin, balance));
-
-            Ok(())
-        }
-
-        /// Set the default inherent asset
-        /// @origin
-        /// @asset    The asset to become inherent asset
-        #[weight = 1]
-        pub fn set_inherent_asset(origin, asset: T::AssetId) -> Result {
-            //ensure_root(origin)?;
-            <InherentAsset<T>>::mutate(|ia| *ia = asset.clone());
-
-            // debug
-            sp_runtime::print("----> Inhere Asset Id");
-            let b: u64 = Self::inherent_asset_id().into();
-            sp_runtime::print(b);
-
-            Ok(())
-        }
 
         /// Set global fee rate, need root permission
         /// @origin
@@ -167,19 +81,6 @@ decl_module! {
         pub fn set_fee_rate(origin, fee_rate: T::FeeRate) -> Result {
             //ensure_root(origin)?;
             <FeeRateGlobal<T>>::mutate(|fr| *fr = fee_rate);
-
-            Ok(())
-        }
-
-        /// Transfer an asset to another account
-        #[weight = 1]
-        pub fn transfer_asset(origin,
-                    id: T::AssetId,
-                    to_account: T::AccountId,
-                    amount: T::Balance
-        ) -> Result {
-            let from_account = ensure_signed(origin)?;
-            Self::transfer(from_account, id, to_account, amount);
 
             Ok(())
         }
@@ -200,7 +101,7 @@ decl_module! {
             min_output: T::Balance) -> Result {
 
             let input_account = ensure_signed(origin)?;
-            let inherent_asset_id = Self::inherent_asset_id();
+            let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
             // check
 
 
@@ -261,7 +162,7 @@ decl_module! {
             max_input: T::Balance) -> Result {
 
             let input_account = ensure_signed(origin)?;
-            let inherent_asset_id = Self::inherent_asset_id();
+            let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
             // check
 
 
@@ -366,75 +267,10 @@ decl_module! {
 
 impl<T: Trait> Module<T>
 where
-    u64: core::convert::From<<T as Trait>::AssetId>,
-    u128: core::convert::From<<T as Trait>::Balance>,
-    <T as Trait>::Balance: core::convert::From<u128>,
+    u64: core::convert::From<<T as assets::Trait>::AssetId>,
+    u128: core::convert::From<<T as assets::Trait>::Balance>,
+    <T as assets::Trait>::Balance: core::convert::From<u128>,
 {
-    /// Issue a new class of fungible assets. There are, and will only ever be, `total`
-    /// such assets and they'll all belong to the `origin` initially. It will have an
-    /// identifier `AssetId` instance: this will be specified in the `Issued` event.
-    /// This will make a increased id asset.
-    /// @origin
-    /// @total    How much balance of new asset
-    fn _issue(account: T::AccountId, total: T::Balance) -> sp_std::result::Result<(), &'static str> {
-        let id = Self::next_asset_id();
-        <NextAssetId<T>>::mutate(|id| *id += One::one());
-
-        <Balances<T>>::insert((id, account.clone()), total);
-        <TotalSupply<T>>::insert(id, total);
-
-        // debug
-        sp_runtime::print("----> asset id, total balance");
-        let idn: u64 = id.into();
-        sp_runtime::print(idn);
-        let b: u128 = <Balances<T>>::get((id, account.clone())).into();
-        sp_runtime::print(b as u64);
-
-        Self::deposit_event(RawEvent::Issued(id, account, total));
-
-        Ok(())
-    }
-
-    /// Move some assets from one holder to another.
-    /// @from_account    The account lost amount of a certain asset balance
-    /// @id              The asset id to be transfered
-    /// @to_account      The account receive the sent asset balance
-    /// @amount          The amount value to be transfered
-    fn transfer(
-        from_account: T::AccountId,
-        id: T::AssetId,
-        to_account: T::AccountId,
-        amount: T::Balance,
-    ) -> sp_std::result::Result<(), &'static str> {
-        let origin_account = (id, from_account.clone());
-        let origin_balance = <Balances<T>>::get(&origin_account);
-        let target = to_account;
-        ensure!(!amount.is_zero(), "transfer amount should be non-zero");
-        ensure!(
-            origin_balance >= amount,
-            "origin account balance must be greater than or equal to the transfer amount"
-        );
-
-        Self::deposit_event(RawEvent::Transferred(
-            id,
-            from_account,
-            target.clone(),
-            amount,
-        ));
-
-        sp_runtime::print("before transfer target balance ----> ");
-        let b: u128 =
-            Self::get_asset_balance(&(id.clone(), target.clone())).into();
-        sp_runtime::print(b as u64);
-        <Balances<T>>::insert(origin_account, origin_balance - amount);
-        <Balances<T>>::mutate((id, target.clone()), |balance| *balance += amount);
-        sp_runtime::print("after transfer target balance----> ");
-        let b: u128 =
-            Self::get_asset_balance(&(id.clone(), target)).into();
-        sp_runtime::print(b as u64);
-        Ok(())
-    }
-
     /// Input inherent asset, output paired asset, with exact input amount
     /// @input_account    The account to send inherent asset to paired pool
     /// @output_account   The account to receive paired asset from paired pool
@@ -455,20 +291,20 @@ where
 
         // check paired_asset_output_amount > 0
         // check paired_asset_output_amount >= min_output_amount
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
 
         // check input_account's balance > input_amount
 
         let exchange_address = Self::get_exchange_address(inherent_asset_id, paired_asset_id);
 
         // do transfer
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             input_account.clone(),
             inherent_asset_id.clone(),
             exchange_address.clone(),
             input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_address.clone(),
             paired_asset_id.clone(),
             output_account,
@@ -478,18 +314,18 @@ where
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -501,13 +337,13 @@ where
         ));
 
         // emit event
-        let asset_balance_in_pool = Self::balance(paired_asset_id, exchange_address.clone());
+        let asset_balance_in_pool = <assets::Module<T>>::balance(paired_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             paired_asset_id,
             asset_balance_in_pool,
         ));
         let inherent_asset_balance_in_pool =
-            Self::balance(inherent_asset_id, exchange_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool,
@@ -539,18 +375,18 @@ where
         // check inherent_asset_input_amount <= max_input_amount
         // check input_account's balance >= inherent_asset_input_amount
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address =
             Self::get_exchange_address(inherent_asset_id.clone(), paired_asset_id);
 
         // do transfer
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             input_account.clone(),
             inherent_asset_id,
             exchange_address.clone(),
             inherent_asset_input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_address.clone(),
             paired_asset_id.clone(),
             output_account,
@@ -560,18 +396,18 @@ where
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -583,13 +419,13 @@ where
         ));
 
         // emit event
-        let asset_balance_in_pool = Self::balance(paired_asset_id, exchange_address.clone());
+        let asset_balance_in_pool = <assets::Module<T>>::balance(paired_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             paired_asset_id,
             asset_balance_in_pool,
         ));
         let inherent_asset_balance_in_pool =
-            Self::balance(inherent_asset_id, exchange_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool,
@@ -621,20 +457,20 @@ where
         // check inherent_asset_output_amount > 0
         // check inherent_asset_output_amount >= min_output_amount
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address =
             Self::get_exchange_address(inherent_asset_id.clone(), paired_asset_id);
 
         // check inherent asset balance of exchange poll >= inherent_asset_output_amount
 
         // do transfer
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             input_account.clone(),
             paired_asset_id.clone(),
             exchange_address.clone(),
             input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_address.clone(),
             inherent_asset_id.clone(),
             output_account,
@@ -644,18 +480,18 @@ where
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -667,13 +503,13 @@ where
         ));
 
         // emit event
-        let asset_balance_in_pool = Self::balance(paired_asset_id, exchange_address.clone());
+        let asset_balance_in_pool = <assets::Module<T>>::balance(paired_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             paired_asset_id,
             asset_balance_in_pool,
         ));
         let inherent_asset_balance_in_pool =
-            Self::balance(inherent_asset_id, exchange_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool,
@@ -705,20 +541,20 @@ where
         // check inherent_asset_output_amount > 0
         // check inherent_asset_output_amount >= min_output_amount
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address =
             Self::get_exchange_address(inherent_asset_id.clone(), paired_asset_id);
 
         // check inherent asset balance of exchange poll >= inherent_asset_output_amount
 
         // do transfer
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             input_account.clone(),
             paired_asset_id,
             exchange_address.clone(),
             paired_asset_input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_address.clone(),
             inherent_asset_id.clone(),
             output_account,
@@ -728,18 +564,18 @@ where
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -751,13 +587,13 @@ where
         ));
 
         // emit event
-        let asset_balance_in_pool = Self::balance(paired_asset_id, exchange_address.clone());
+        let asset_balance_in_pool = <assets::Module<T>>::balance(paired_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             paired_asset_id,
             asset_balance_in_pool,
         ));
         let inherent_asset_balance_in_pool =
-            Self::balance(inherent_asset_id, exchange_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool,
@@ -783,7 +619,7 @@ where
         min_output_amount: T::Balance,
         fee_rate: T::FeeRate,
     ) -> sp_std::result::Result<T::Balance, &'static str> {
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_a_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_a);
         let exchange_b_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_b);
 
@@ -795,19 +631,19 @@ where
         // CHECKS
 
         // do transfer
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             input_account.clone(),
             asset_a.clone(),
             exchange_a_address.clone(),
             input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_a_address.clone(),
             inherent_asset_id.clone(),
             exchange_b_address.clone(),
             inherent_asset_output_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_b_address.clone(),
             asset_b.clone(),
             output_account,
@@ -819,29 +655,29 @@ where
             "----> exchange a inherent asset balance, exchange a paired asset balance",
         );
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone()))
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone()))
                 .into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print(
             "----> exchange b inherent asset balance, exchange b paired asset balance",
         );
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone()))
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone()))
                 .into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account asset a balance, account asset b balance");
-        let b: u128 = Self::get_asset_balance(&(asset_a.clone(), input_account.clone())).into();
+        let b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), input_account.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_b.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), input_account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -853,18 +689,18 @@ where
         ));
 
         // emit event
-        let asset_a_balance_in_pool = Self::balance(asset_a, exchange_a_address.clone());
+        let asset_a_balance_in_pool = <assets::Module<T>>::balance(asset_a, exchange_a_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(asset_a, asset_a_balance_in_pool));
         let inherent_asset_balance_in_a_pool =
-            Self::balance(inherent_asset_id, exchange_a_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_a_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_a_pool,
         ));
-        let asset_b_balance_in_pool = Self::balance(asset_b, exchange_b_address.clone());
+        let asset_b_balance_in_pool = <assets::Module<T>>::balance(asset_b, exchange_b_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(asset_b, asset_b_balance_in_pool));
         let inherent_asset_balance_in_pool_b =
-            Self::balance(inherent_asset_id, exchange_b_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_b_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool_b,
@@ -890,7 +726,7 @@ where
         max_input_amount: T::Balance,
         fee_rate: T::FeeRate,
     ) -> sp_std::result::Result<T::Balance, &'static str> {
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_a_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_a);
         let exchange_b_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_b);
 
@@ -902,19 +738,19 @@ where
         // CHECKS
 
         // do transfer
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             input_account.clone(),
             asset_a.clone(),
             exchange_a_address.clone(),
             asset_a_input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_a_address.clone(),
             inherent_asset_id.clone(),
             exchange_b_address.clone(),
             inherent_asset_input_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_b_address.clone(),
             asset_b.clone(),
             output_account,
@@ -926,29 +762,29 @@ where
             "----> exchange a inherent asset balance, exchange a paired asset balance",
         );
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone()))
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone()))
                 .into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print(
             "----> exchange b inherent asset balance, exchange b paired asset balance",
         );
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone()))
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone()))
                 .into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account asset a balance, account asset b balance");
-        let b: u128 = Self::get_asset_balance(&(asset_a.clone(), input_account.clone())).into();
+        let b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), input_account.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_b.clone(), input_account.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), input_account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -960,18 +796,18 @@ where
         ));
 
         // emit event
-        let asset_a_balance_in_pool = Self::balance(asset_a, exchange_a_address.clone());
+        let asset_a_balance_in_pool = <assets::Module<T>>::balance(asset_a, exchange_a_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(asset_a, asset_a_balance_in_pool));
         let inherent_asset_balance_in_a_pool =
-            Self::balance(inherent_asset_id, exchange_a_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_a_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_a_pool,
         ));
-        let asset_b_balance_in_pool = Self::balance(asset_b, exchange_b_address.clone());
+        let asset_b_balance_in_pool = <assets::Module<T>>::balance(asset_b, exchange_b_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(asset_b, asset_b_balance_in_pool));
         let inherent_asset_balance_in_pool_b =
-            Self::balance(inherent_asset_id, exchange_b_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_b_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool_b,
@@ -991,12 +827,12 @@ where
     ) -> sp_std::result::Result<T::Balance, &'static str> {
         // ensure!(amount > Zero::zero(), "");
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_id);
 
         let inherent_asset_balance =
-            Self::balance(inherent_asset_id.clone(), exchange_address.clone());
-        let paired_asset_balance = Self::balance(asset_id, exchange_address);
+            <assets::Module<T>>::balance(inherent_asset_id.clone(), exchange_address.clone());
+        let paired_asset_balance = <assets::Module<T>>::balance(asset_id, exchange_address);
 
         let input_amount = Self::calc_input_at_known_output(
             amount,
@@ -1019,11 +855,11 @@ where
     ) -> sp_std::result::Result<T::Balance, &'static str> {
         // ensure!(amount > Zero::zero(), "");
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_id);
 
-        let inherent_asset_balance = Self::balance(inherent_asset_id, exchange_address.clone());
-        let paired_asset_balance = Self::balance(asset_id, exchange_address);
+        let inherent_asset_balance = <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
+        let paired_asset_balance = <assets::Module<T>>::balance(asset_id, exchange_address);
 
         let output_amount = Self::calc_output_at_known_input(
             amount,
@@ -1046,11 +882,11 @@ where
     ) -> sp_std::result::Result<T::Balance, &'static str> {
         // ensure!(amount > Zero::zero(), "");
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_id);
 
-        let inherent_asset_balance = Self::balance(inherent_asset_id, exchange_address.clone());
-        let paired_asset_balance = Self::balance(asset_id, exchange_address);
+        let inherent_asset_balance = <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
+        let paired_asset_balance = <assets::Module<T>>::balance(asset_id, exchange_address);
 
         let input_amount = Self::calc_input_at_known_output(
             amount,
@@ -1073,11 +909,11 @@ where
     ) -> sp_std::result::Result<T::Balance, &'static str> {
         //ensure!(amount > Zero::zero(), "");
 
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_id);
 
-        let inherent_asset_balance = Self::balance(inherent_asset_id, exchange_address.clone());
-        let paired_asset_balance = Self::balance(asset_id, exchange_address);
+        let inherent_asset_balance = <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
+        let paired_asset_balance = <assets::Module<T>>::balance(asset_id, exchange_address);
 
         let output_amount = Self::calc_output_at_known_input(
             amount,
@@ -1162,7 +998,7 @@ where
         asset_amount: T::Balance,
         min_liquidity: T::Balance,
     ) {
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address = Self::get_exchange_address(inherent_asset_id, asset_id);
 
         // TODO: checks
@@ -1171,13 +1007,13 @@ where
 
         if total_liquidity.is_zero() {
             // initializing injection
-            Self::transfer(
+            <assets::Module<T>>::transfer(
                 account.clone(),
                 inherent_asset_id.clone(),
                 exchange_address.clone(),
                 inherent_asset_amount,
             );
-            Self::transfer(
+            <assets::Module<T>>::transfer(
                 account.clone(),
                 asset_id.clone(),
                 exchange_address.clone(),
@@ -1190,16 +1026,16 @@ where
         // emit event
         } else {
             let inherent_asset_in_pool =
-                Self::balance(inherent_asset_id.clone(), exchange_address.clone());
-            let asset_in_pool = Self::balance(asset_id, exchange_address.clone());
+                <assets::Module<T>>::balance(inherent_asset_id.clone(), exchange_address.clone());
+            let asset_in_pool = <assets::Module<T>>::balance(asset_id, exchange_address.clone());
 
-            Self::transfer(
+            <assets::Module<T>>::transfer(
                 account.clone(),
                 inherent_asset_id.clone(),
                 exchange_address.clone(),
                 inherent_asset_amount,
             );
-            Self::transfer(
+            <assets::Module<T>>::transfer(
                 account.clone(),
                 asset_id.clone(),
                 exchange_address.clone(),
@@ -1230,23 +1066,23 @@ where
 
         sp_runtime::print("add liquidity  ----> exchange inherent asset balance, exchange paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("add liquidity  ----> account inherent asset balance, account paired asset balance");
-        let b: u128 = Self::get_asset_balance(&(inherent_asset_id.clone(), account.clone())).into();
+        let b: u128 = <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), account.clone())).into();
         sp_runtime::print(b as u64);
-        let paired_b: u128 = Self::get_asset_balance(&(asset_id.clone(), account.clone())).into();
+        let paired_b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         // emit event
-        let asset_balance_in_pool = Self::balance(asset_id, exchange_address.clone());
+        let asset_balance_in_pool = <assets::Module<T>>::balance(asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(asset_id, asset_balance_in_pool));
         let inherent_asset_balance_in_pool =
-            Self::balance(inherent_asset_id, exchange_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool,
@@ -1266,13 +1102,13 @@ where
         min_inherent_asset_amount: T::Balance,
         min_asset_amount: T::Balance,
     ) {
-        let inherent_asset_id = Self::inherent_asset_id();
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
         let exchange_address = Self::get_exchange_address(inherent_asset_id.clone(), asset_id);
         let account_liquidity = Self::get_liquidity(asset_id, account.clone());
         let total_liquidity = Self::get_total_liquidity(asset_id);
 
-        let inherent_asset_in_pool = Self::balance(inherent_asset_id, exchange_address.clone());
-        let asset_in_pool = Self::balance(asset_id, exchange_address.clone());
+        let inherent_asset_in_pool = <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
+        let asset_in_pool = <assets::Module<T>>::balance(asset_id, exchange_address.clone());
 
         // TODO: type cast
         let inherent_asset_amount = inherent_asset_in_pool * liquidity / total_liquidity;
@@ -1280,13 +1116,13 @@ where
 
         // TODO: checks
 
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_address.clone(),
             inherent_asset_id.clone(),
             account.clone(),
             inherent_asset_amount,
         );
-        Self::transfer(
+        <assets::Module<T>>::transfer(
             exchange_address.clone(),
             asset_id,
             account.clone(),
@@ -1306,23 +1142,23 @@ where
 
         sp_runtime::print("_remove_liquidity ----> exchange inherent asset balance, exchange paired asset balance");
         let b: u128 =
-            Self::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(b as u64);
         let paired_b: u128 =
-            Self::get_asset_balance(&(asset_id.clone(), exchange_address.clone())).into();
+            <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), exchange_address.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
-        let b: u128 = Self::get_asset_balance(&(inherent_asset_id.clone(), account.clone())).into();
+        let b: u128 = <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), account.clone())).into();
         sp_runtime::print(b as u64);
-        let paired_b: u128 = Self::get_asset_balance(&(asset_id.clone(), account.clone())).into();
+        let paired_b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), account.clone())).into();
         sp_runtime::print(paired_b as u64);
 
         // emit event
-        let asset_balance_in_pool = Self::balance(asset_id, exchange_address.clone());
+        let asset_balance_in_pool = <assets::Module<T>>::balance(asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(asset_id, asset_balance_in_pool));
         let inherent_asset_balance_in_pool =
-            Self::balance(inherent_asset_id, exchange_address.clone());
+            <assets::Module<T>>::balance(inherent_asset_id, exchange_address.clone());
         Self::deposit_event(RawEvent::ReserveChanged(
             inherent_asset_id,
             inherent_asset_balance_in_pool,
@@ -1397,29 +1233,6 @@ where
     fn get_exchange_address(inherent_asset_id: T::AssetId, asset_id: T::AssetId) -> T::AccountId {
         T::ExchangeAddress::make_exchange_address(inherent_asset_id, asset_id)
     }
-
-    /// Get the asset `id` balance of `who`.
-    /// @id    Asset id
-    /// @who   Account id
-    pub fn balance(id: T::AssetId, who: T::AccountId) -> T::Balance {
-        // debug
-        sp_runtime::print("----> Account Asset Balance");
-        let b: u128 = Self::get_asset_balance(&(id.clone(), who.clone())).into();
-        sp_runtime::print(b as u64);
-
-        <Balances<T>>::get((id, who))
-    }
-
-    /// Get the total supply of an asset `id`.
-    /// @id    Asset id
-    pub fn total_supply(id: T::AssetId) -> T::Balance {
-        // debug
-        sp_runtime::print("----> Asset Total Supply");
-        let b: u128 = Self::get_asset_total_supply(id.clone()).into();
-        sp_runtime::print(b as u64);
-
-        <TotalSupply<T>>::get(id)
-    }
 }
 
 /// Exchange Factory
@@ -1435,7 +1248,7 @@ pub struct ExchangeAddress<T: Trait>(PhantomData<T>);
 impl<T: Trait> ExchangeFactory<T::AssetId, T::AccountId> for ExchangeAddress<T>
 where
     T::AccountId: UncheckedFrom<T::Hash>,
-    u64: core::convert::From<<T as Trait>::AssetId>,
+    u64: core::convert::From<<T as assets::Trait>::AssetId>,
 {
     fn make_exchange_address(inherent_asset_id: T::AssetId, asset_id: T::AssetId) -> T::AccountId {
         let mut buf = Vec::new();
@@ -1458,7 +1271,7 @@ pub struct ExchangeAddressMock<T: Trait>(PhantomData<T>);
 /// Impl ExchangeFactory for ExchangeAddress
 impl<T: Trait> ExchangeFactory<T::AssetId, T::AccountId> for ExchangeAddressMock<T>
 where
-    u64: core::convert::From<<T as Trait>::AssetId>,
+    u64: core::convert::From<<T as assets::Trait>::AssetId>,
     <T as system::Trait>::AccountId: core::convert::From<u64>,
 {
     fn make_exchange_address(inherent_asset_id: T::AssetId, asset_id: T::AssetId) -> T::AccountId {

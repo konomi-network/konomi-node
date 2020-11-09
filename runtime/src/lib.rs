@@ -258,12 +258,18 @@ impl pallet_sudo::Trait for Runtime {
 	type Call = Call;
 }
 
+pub use pallet_assets;
+
+impl pallet_assets::Trait for Runtime {
+    type Event = Event;
+    type Balance = Balance;
+    type AssetId = u64;
+}
+
 pub use pallet_swap;
 
 impl pallet_swap::Trait for Runtime {
     type Event = Event;
-    type Balance = Balance;
-    type AssetId = u64;
     type ExchangeAddress = pallet_swap::ExchangeAddress<Self>;
     type FeeRate = u64;
 }
@@ -283,6 +289,7 @@ construct_runtime!(
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
+		Assets: pallet_assets::{Module, Call, Storage, Config<T>, Event<T>},		
 		Swap: pallet_swap::{Module, Call, Storage, Config<T>, Event<T>},
 	}
 );
