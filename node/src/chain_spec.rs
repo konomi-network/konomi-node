@@ -1,7 +1,7 @@
 use sp_core::{Pair, Public, sr25519};
 use node_template_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature, UniswapConfig
+	SudoConfig, SystemConfig, WASM_BINARY, Signature, SwapConfig
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -153,7 +153,7 @@ fn testnet_genesis(
 			// Assign network admin rights.
 			key: root_key,
 		}),
-		uniswap: Some(UniswapConfig {
+		pallet_swap: Some(SwapConfig {
             owner: get_account_id_from_seed::<sr25519::Public>("Bob"),
             fee_rate: 1,
             assets: vec![

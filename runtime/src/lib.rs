@@ -38,9 +38,6 @@ pub use frame_support::{
 	},
 };
 
-/// Import the template pallet.
-pub use pallet_template;
-
 /// An index to a block.
 pub type BlockNumber = u32;
 
@@ -66,8 +63,6 @@ pub type Hash = sp_core::H256;
 
 /// Digest item type.
 pub type DigestItem = generic::DigestItem<Hash>;
-
-pub mod uniswap;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -263,16 +258,13 @@ impl pallet_sudo::Trait for Runtime {
 	type Call = Call;
 }
 
-/// Configure the template pallet in pallets/template.
-impl pallet_template::Trait for Runtime {
-	type Event = Event;
-}
+pub use pallet_swap;
 
-impl uniswap::Trait for Runtime {
+impl pallet_swap::Trait for Runtime {
     type Event = Event;
     type Balance = Balance;
     type AssetId = u64;
-    type ExchangeAddress = uniswap::ExchangeAddress<Self>;
+    type ExchangeAddress = pallet_swap::ExchangeAddress<Self>;
     type FeeRate = u64;
 }
 
@@ -291,9 +283,7 @@ construct_runtime!(
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
-		// Include the custom logic from the template pallet in the runtime.
-		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
-		Uniswap: uniswap::{Module, Call, Storage, Config<T>, Event<T>},
+		Swap: pallet_swap::{Module, Call, Storage, Config<T>, Event<T>},
 	}
 );
 

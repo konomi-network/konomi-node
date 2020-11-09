@@ -1,11 +1,5 @@
-/// A runtime module template with necessary imports
+#![cfg_attr(not(feature = "std"), no_std)]
 
-/// Feel free to remove or edit this file as needed.
-/// If you change the name of this file, make sure to update its references in runtime/src/lib.rs
-/// If you remove this file, you can remove those references
-
-/// For more guidance on Substrate modules, see the example module
-/// https://github.com/paritytech/substrate/blob/master/srml/example/src/lib.rs
 use frame_support::{
     decl_event, decl_module, decl_storage, ensure, Parameter,
     StorageDoubleMap, StorageMap, StorageValue,
@@ -60,7 +54,7 @@ decl_event!(
 
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Uniswap
+    trait Store for Module<T: Trait> as Swap
     where
         u64: core::convert::From<<T as Trait>::AssetId>,
         u128: core::convert::From<<T as Trait>::Balance>,

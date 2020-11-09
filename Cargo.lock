@@ -3280,7 +3280,7 @@ dependencies = [
  "pallet-grandpa",
  "pallet-randomness-collective-flip",
  "pallet-sudo",
- "pallet-template",
+ "pallet-swap",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
@@ -3589,15 +3589,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-template"
+name = "pallet-swap"
 version = "2.0.0"
 dependencies = [
  "frame-support",
  "frame-system",
  "parity-scale-codec",
+ "serde",
  "sp-core",
- "sp-io",
  "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
