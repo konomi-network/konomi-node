@@ -2,16 +2,15 @@
 
 use frame_support::{
     decl_event, decl_module, decl_storage, ensure, Parameter,
-    StorageDoubleMap, StorageMap, StorageValue,
+    StorageMap, StorageValue,
 };
-use sp_runtime::{DispatchError, DispatchResult as Result, traits::Dispatchable};
-use frame_system::{self as system, ensure_root, ensure_signed};
-use sp_std::convert::TryInto;
-use sp_core::crypto::{UncheckedFrom, UncheckedInto, Wraps};
+use sp_runtime::DispatchResult as Result;
+use frame_system::{self as system, ensure_signed};
+use sp_core::crypto::{UncheckedFrom, UncheckedInto};
 use sp_std::prelude::*;
 use sp_std::{marker::PhantomData, mem, vec::Vec};
 use sp_runtime::traits::{
-    Bounded, Hash, Member, One, SaturatedConversion, AtLeast32BitUnsigned, StaticLookup, Zero,
+    Bounded, Hash, Member, One, AtLeast32BitUnsigned, Zero,
 };
 
 /// The module's configuration trait.
