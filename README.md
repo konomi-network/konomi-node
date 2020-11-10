@@ -1,8 +1,12 @@
-# Konomi Blockchain
+# Konomi node
 
-A substrate based chain for DeFi innovation.
+A substrate based node for DeFi innovation.
 
 Currently there is a preliminary uniswap like AMM with functionalities of swap, add pool, add liquidity and remove liquidity. An auxiliary currency functionality is also provided to enable the AMM.
+
+## pallets
+- assets: asset for swap and lending
+- swap: swap, add liquidity and remove liquidity functionalities
 
 ## Local Development
 
