@@ -61,6 +61,8 @@ pub type Index = u32;
 /// A hash of some data used by the chain.
 pub type Hash = sp_core::H256;
 
+pub type AssetId = u64;
+
 /// Digest item type.
 pub type DigestItem = generic::DigestItem<Hash>;
 
@@ -263,7 +265,7 @@ pub use pallet_assets;
 impl pallet_assets::Trait for Runtime {
     type Event = Event;
     type Balance = Balance;
-    type AssetId = u64;
+    type AssetId = AssetId;
 }
 
 pub use pallet_swap;
@@ -450,6 +452,12 @@ impl_runtime_apis! {
 			TransactionPayment::query_info(uxt, len)
 		}
 	}
+
+	impl pallet_swap_rpc_runtime_api::SwapApi<Block, AssetId, Balance> for Runtime {
+        fn calculate_output(in_id: AssetId, out_id: AssetId, amount_in: Balance) -> Balance {
+            Swap::calculate_output(in_id, out_id, amount_in)
+        }
+    }
 
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {

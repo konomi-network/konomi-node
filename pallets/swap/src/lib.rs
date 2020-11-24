@@ -816,6 +816,18 @@ where
         Ok(asset_a_input_amount)
     }
 
+    pub fn calculate_output(in_id: T::AssetId, out_id: T::AssetId, amount_in: T::Balance) -> T::Balance {
+        let inherent_asset_id = <assets::Module<T>>::inherent_asset_id();
+        let fee_rate = Self::fee_rate();
+        if in_id == inherent_asset_id {
+            let out = Self::calc_paired_asset_output_amount(out_id, amount_in, fee_rate).unwrap();
+            out
+        } else {
+            let out = Self::calc_inherent_asset_output_amount(out_id, amount_in, fee_rate).unwrap();
+            out
+        }
+    }
+
     /// Calculate how much amount of inherent asset should be input
     /// @asset_id    The paired asset id
     /// @amount      The amount of the paired asset output

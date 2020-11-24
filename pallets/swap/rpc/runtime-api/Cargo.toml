@@ -1,0 +1,23 @@
+[package]
+name = "pallet-swap-rpc-runtime-api"
+version = "2.0.0"
+authors = ["Konomi team"]
+edition = "2018"
+license = "Apache-2.0"
+description = "RPC runtime API for swap FRAME pallet"
+readme = "README.md"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+sp-api = { default-features = false, version = '2.0.0' }
+codec = { package = "parity-scale-codec", version = "1.3.1", default-features = false, features = ["derive"] }
+
+
+[features]
+default = ["std"]
+std = [
+	"sp-api/std",
+	"codec/std",
+]
