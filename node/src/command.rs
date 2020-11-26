@@ -23,7 +23,7 @@ use konomi_runtime::Block;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"Substrate Node".into()
+		"Konomi Node".into()
 	}
 
 	fn impl_version() -> String {

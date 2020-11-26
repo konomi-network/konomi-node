@@ -7,7 +7,7 @@ homepage = 'https://konomi.network'
 license = 'Unlicense'
 name = 'konomi-node'
 repository = 'https://github.com/konomi-network/konomi-node'
-version = '2.0.0'
+version = '0.1.0'
 
 [[bin]]
 name = 'konomi-node'
