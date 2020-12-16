@@ -4,7 +4,7 @@ use frame_support::{
     decl_event, decl_module, decl_storage, Parameter,
     StorageMap, StorageValue,
 };
-use sp_runtime::DispatchResult as Result;
+use sp_runtime::{DispatchResult as Result, RuntimeDebug};
 use frame_system::{self as system, ensure_signed};
 use sp_core::crypto::{UncheckedFrom, UncheckedInto};
 use sp_std::prelude::*;
@@ -13,6 +13,7 @@ use sp_runtime::traits::{
     Bounded, Hash, AtLeast32BitUnsigned, Zero,
 };
 use pallet_assets as assets;
+use codec::{Encode, Decode};
 
 /// The module's configuration trait.
 pub trait Trait: assets::Trait {
@@ -30,7 +31,7 @@ pub struct Pool<T: Trait> {
 
     pub can_be_collateral: bool,
 	/// Source of the swap.
-	pub asset: <Self as assets::Trait>::AssetId,
+	pub asset: <T as assets::Trait>::AssetId,
 	/// Action of this swap.
 	pub supply: T::Balance,
 	/// End block of the lock.
@@ -51,7 +52,7 @@ pub struct Pool<T: Trait> {
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserSupply<T: Trait> {
 	/// Source of the swap.
-	pub amount: <Self as assets::Trait>::Balance,
+	pub amount: <T as assets::Trait>::Balance,
 	/// Action of this swap.
     pub index: u64,
     
@@ -61,7 +62,7 @@ pub struct UserSupply<T: Trait> {
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserDebt<T: Trait> {
 	/// Source of the swap.
-	pub amount: <Self as assets::Trait>::Balance,
+	pub amount: <T as assets::Trait>::Balance,
 	/// Action of this swap.
 	pub index: u64,
 }
@@ -79,25 +80,19 @@ decl_event!(
 
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Swap
-    where
-        <T as assets::Trait>::AssetId
-        u64: core::convert::From<<T as assets::Trait>::AssetId>,
-        u128: core::convert::From<<T as assets::Trait>::Balance>,
-    <T as assets::Trait>::Balance: core::convert::From<u128>
+    trait Store for Module<T: Trait> as Lending
     {
         pub UserDebts: double_map
-        hasher(blake2_128_concat) AssetId, hasher(blake2_128_concat) AccountId
+        hasher(blake2_128_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
         => Option<UserDebt<T>>;
 
         pub UserSupplies: double_map
-        hasher(blake2_128_concat) AssetId, hasher(blake2_128_concat) AccountId
+        hasher(blake2_128_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
         => Option<UserSupply<T>>;
 
-        pub Pools get(fn pool): map hasher(blake2_128_concat) AssetId => Option<Pool<T>>;
+        pub Pools get(fn pool): map hasher(blake2_128_concat) T::AssetId => Option<Pool<T>>;
 
-        pub UserCollaterals: map hasher(blake2_128_concat) AcountId => Vec<AssetId;
-
+        pub UserCollaterals: map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
 
         /// The global fee rate of this platform
         FeeRateGlobal get(fn fee_rate) config(): T::FeeRate;
@@ -109,11 +104,7 @@ decl_storage! {
 // The module's dispatchable functions.
 decl_module! {
     pub struct Module<T: Trait> for enum Call where
-        origin: T::Origin,
-        u64: core::convert::From<<T as assets::Trait>::AssetId>,
-        u128: core::convert::From<<T as assets::Trait>::Balance>,
-    <T as assets::Trait>::Balance: core::convert::From<u128>
-    {
+        origin: T::Origin {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
@@ -199,15 +190,15 @@ impl<T: Trait> Module<T>
 {
 
     fn get_borrow_rate(asset_id: T::AssetId) -> T::Balance {
-
+        T::Balance::default()
     }
 
     fn get_supply_rate(asset_id: T::AssetId) -> T::Balance {
-
+        T::Balance::default()
     }
 
     fn get_user_total_collaterals(account: T::AccountId) -> T::Balance {
-
+        T::Balance::default()
     }
 
 }
