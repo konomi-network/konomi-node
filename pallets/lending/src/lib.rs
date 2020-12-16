@@ -15,12 +15,14 @@ use sp_runtime::traits::{
 use pallet_assets as assets;
 use codec::{Encode, Decode};
 
+// TODO: fee, reserves
+// TODO: loose couple
+// TODO: child storage
+
 /// The module's configuration trait.
 pub trait Trait: assets::Trait {
     /// The overarching event type.
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;    /// 
-    /// The global fee rate
-    type FeeRate: Parameter + AtLeast32BitUnsigned + Default + Copy;
+    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 
@@ -30,11 +32,11 @@ pub struct Pool<T: Trait> {
     pub enabled: bool,
 
     pub can_be_collateral: bool,
-	/// Source of the swap.
+
 	pub asset: <T as assets::Trait>::AssetId,
-	/// Action of this swap.
+
 	pub supply: T::Balance,
-	/// End block of the lock.
+
     pub debt: T::Balance,
 
     pub liquidation_threshold: T::Balance,
@@ -83,19 +85,16 @@ decl_storage! {
     trait Store for Module<T: Trait> as Lending
     {
         pub UserDebts: double_map
-        hasher(blake2_128_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
+        hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
         => Option<UserDebt<T>>;
 
         pub UserSupplies: double_map
-        hasher(blake2_128_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
+        hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
         => Option<UserSupply<T>>;
 
-        pub Pools get(fn pool): map hasher(blake2_128_concat) T::AssetId => Option<Pool<T>>;
+        pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
 
         pub UserCollaterals: map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
-
-        /// The global fee rate of this platform
-        FeeRateGlobal get(fn fee_rate) config(): T::FeeRate;
 
     }
 
@@ -108,17 +107,6 @@ decl_module! {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
-
-        /// Set global fee rate, need root permission
-        /// @origin
-        /// @fee_rate    the global fee rate on each transaction
-        #[weight = 1]
-        pub fn set_fee_rate(origin, fee_rate: T::FeeRate) -> Result {
-            //ensure_root(origin)?;
-            <FeeRateGlobal<T>>::mutate(|fr| *fr = fee_rate);
-
-            Ok(())
-        }
 
         #[weight = 1]
         fn supply(
