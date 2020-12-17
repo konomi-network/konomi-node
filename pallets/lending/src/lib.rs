@@ -48,6 +48,8 @@ pub struct Pool<T: Trait> {
     pub total_supply_index: u64,
 
     pub total_debt_index: u64,
+
+    pub last_updated: T::BlockNumber // TODO: considering timestamp?
     
 }
 
@@ -108,6 +110,8 @@ decl_module! {
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
 
+        /// end user related
+ 
         #[weight = 1]
         fn supply(
             origin,
@@ -116,6 +120,10 @@ decl_module! {
             let account = ensure_signed(origin)?;
 
             // TODO
+            // 1 accrue interest
+            // 2 transfer asset
+            // 3 update user supply
+            // 4 update pool supply
 
             Ok(())
         }
@@ -128,6 +136,10 @@ decl_module! {
             let account = ensure_signed(origin)?;
 
             // TODO
+            // 1 accrue interest
+            // 2 check collateral and pool cash = (deposit - borrow)
+            // 3 update user supply
+            // 4 transfer asset to user
 
             Ok(())
         }
@@ -140,7 +152,11 @@ decl_module! {
             let account = ensure_signed(origin)?;
 
             // TODO
-
+            // 1 accrue interest
+            // 2 check collateral
+            // 3 update user Borrow
+            // 4 update pool borrow
+            // 5 transfer asset to user
             Ok(())
         }
 
@@ -152,9 +168,26 @@ decl_module! {
             let account = ensure_signed(origin)?;
 
             // TODO
+            // 1 accrue interest
+            // 2 transfer token from user
+            // 3 update user borrow: if all loan is repaid, clean up the loan
+            // 4 update pool borrow
 
             Ok(())
         }
+
+        #[weight = 1]
+        fn choose_collateral(
+            origin,
+            asset_id: t::AssetId,
+            as_collateral: bool
+        ) -> Result {
+
+            // if from true -> false, need to check collateral
+            Ok(())
+        }
+
+        /// arbitrager related
 
         #[weight = 1]
         fn liquidate(
@@ -167,15 +200,41 @@ decl_module! {
             let account = ensure_signed(origin)?;
 
             // TODO
+            // 1 check if get_asset_id is enabled as collatoral
+            // 2 accrue interest of pay and get asset
+            // 3 check if target user is under liquidation condition
+            // 4 check if liquidation % is more than threshold 
+            // 5 transfer token from arbitrager
+            // 6 transfer collateral to arbitrager
+            // 7 recalculate target user's borrow and supply in 2 pools
 
             Ok(())
         }
         
+        /// governance related
+
+        #[weight = 1]
+        fn init_pool(
+            origin,
+            id: T::AssetId,
+            can_be_collateral: bool
+        ) -Result {
+
+            Ok(())
+        }
     }
 }
 
 impl<T: Trait> Module<T>
 {
+    fn accrue_interest(asset_id: T::AssetId) {
+        // TODO
+        // 1 get pool
+        // 2 get supply/borrow rate
+        // 3 get time span
+        // 4 calculate interest
+        // 5 update pool index, supply, borrow, timestamp
+    }
 
     fn get_borrow_rate(asset_id: T::AssetId) -> T::Balance {
         T::Balance::default()
@@ -189,11 +248,4 @@ impl<T: Trait> Module<T>
         T::Balance::default()
     }
 
-}
-
-
-
-/// helper function
-fn u64_to_bytes(x: u64) -> [u8; 8] {
-    unsafe { mem::transmute(x.to_le()) }
 }
