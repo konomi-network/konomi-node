@@ -27,6 +27,7 @@ serde = { features = ['derive'], optional = true, version = '1.0.101' }
 # local dependencies
 pallet-assets = { path = '../pallets/assets', default-features = false, version = '2.0.0' }
 pallet-swap = { path = '../pallets/swap', default-features = false, version = '2.0.0' }
+pallet-lending = { path = '../pallets/lending', default-features = false, version = '2.0.0' }
 pallet-swap-rpc-runtime-api = { version = "0.8.0", default-features = false, path = "../pallets/swap/rpc/runtime-api/" }
 
 # Substrate dependencies

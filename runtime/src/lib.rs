@@ -276,6 +276,10 @@ impl pallet_swap::Trait for Runtime {
     type FeeRate = u64;
 }
 
+impl pallet_lending::Trait for Runtime {
+	type Event = Event;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -293,6 +297,7 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		Assets: pallet_assets::{Module, Call, Storage, Config<T>, Event<T>},		
 		Swap: pallet_swap::{Module, Call, Storage, Config<T>, Event<T>},
+		Lending: pallet_lending::{Module, Call, Storage, Event<T>},
 	}
 );
 
