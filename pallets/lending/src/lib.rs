@@ -1,11 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-    decl_event, decl_module, decl_storage,
+    decl_event, decl_module, decl_storage, decl_error,
     StorageMap, StorageValue,
 };
-use sp_runtime::{DispatchResult as Result, RuntimeDebug};
-use sp_runtime::{traits::AccountIdConversion, ModuleId};
+use sp_runtime::{
+    DispatchResult as Result, RuntimeDebug,
+    traits::AccountIdConversion, ModuleId
+};
 use frame_system::{self as system, ensure_signed};
 use sp_std::prelude::*;
 use sp_std::{vec::Vec, convert::TryInto};
@@ -108,6 +110,12 @@ decl_storage! {
 
 }
 
+decl_error! {
+	pub enum Error for Module<T: Trait> {
+		TransferFailed,
+	}
+}
+
 // The module's dispatchable functions.
 decl_module! {
     pub struct Module<T: Trait> for enum Call where
@@ -134,7 +142,7 @@ decl_module! {
                 asset_id,
                 Self::account_id(),
                 amount,
-            ); // TODO: check result
+            ).map_err(|_| Error::<T>::TransferFailed)?; // TODO: check result
 
             // 3 update user supply
             Self::update_user_supply(asset_id, account.clone(), amount, true);
@@ -258,6 +266,7 @@ impl<T: Trait> Module<T>
     fn accrue_interest(asset_id: T::AssetId) {
         // TODO avoid multi get pool
         // TODO use error of convert error
+        // TODO use compound interest
         // 1 get pool
         let mut pool = Self::pool(asset_id).unwrap();
         if pool.last_updated == <frame_system::Module<T>>::block_number() {
@@ -333,6 +342,30 @@ impl<T: Trait> Module<T>
         }
         UserSupplies::<T>::insert(asset_id, account, user_supply);
 
+    }
+
+    fn update_user_debt(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
+        let pool = Self::pool(asset_id).unwrap();
+
+        let mut user_debt = Self::user_debt(asset_id, account.clone()).unwrap();
+
+        let original_amount = TryInto::<u128>::try_into(user_debt.amount)
+            .ok()
+            .expect("Balance is u128");
+        let amount_with_interest = U64F64::from_num(original_amount) * pool.total_debt_index / user_debt.index;
+        let converted = u128::from_fixed(amount_with_interest);
+        user_debt.amount = TryInto::<T::Balance>::try_into(converted)
+            .ok()
+            .expect("Balance is u128");
+
+        user_debt.index = pool.total_debt_index;
+
+        if positive {
+            user_debt.amount += amount;
+        } else {
+            user_debt.amount -= amount;
+        }
+        UserDebts::<T>::insert(asset_id, account, user_debt);
     }
 
     fn update_pool_supply(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
