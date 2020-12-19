@@ -8,7 +8,7 @@ use sp_runtime::DispatchResult as Result;
 use frame_system::{self as system, ensure_signed};
 use sp_core::crypto::{UncheckedFrom, UncheckedInto};
 use sp_std::prelude::*;
-use sp_std::{marker::PhantomData, mem, vec::Vec};
+use sp_std::{marker::PhantomData, mem, vec::Vec, convert::TryInto};
 use sp_runtime::traits::{
     Bounded, Hash, AtLeast32BitUnsigned, Zero,
 };
@@ -44,12 +44,7 @@ decl_event!(
 
 // This module's storage items.
 decl_storage! {
-    trait Store for Module<T: Trait> as Swap
-    where
-        u64: core::convert::From<<T as assets::Trait>::AssetId>,
-        u128: core::convert::From<<T as assets::Trait>::Balance>,
-    <T as assets::Trait>::Balance: core::convert::From<u128>
-    {
+    trait Store for Module<T: Trait> as Swap {
         /// The global fee rate of this platform
         FeeRateGlobal get(fn fee_rate) config(): T::FeeRate;
         /// Total liquidity of each pair pool (InherentAsset and another asset)
@@ -65,11 +60,7 @@ decl_storage! {
 // The module's dispatchable functions.
 decl_module! {
     pub struct Module<T: Trait> for enum Call where
-        origin: T::Origin,
-        u64: core::convert::From<<T as assets::Trait>::AssetId>,
-        u128: core::convert::From<<T as assets::Trait>::Balance>,
-    <T as assets::Trait>::Balance: core::convert::From<u128>
-    {
+        origin: T::Origin {
         // Initializing events
         // this is needed only if you are using events in your module
         fn deposit_event() = default;
@@ -265,12 +256,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T>
-where
-    u64: core::convert::From<<T as assets::Trait>::AssetId>,
-    u128: core::convert::From<<T as assets::Trait>::Balance>,
-    <T as assets::Trait>::Balance: core::convert::From<u128>,
-{
+impl<T: Trait> Module<T> {
     /// Input inherent asset, output paired asset, with exact input amount
     /// @input_account    The account to send inherent asset to paired pool
     /// @output_account   The account to receive paired asset from paired pool
@@ -313,19 +299,23 @@ where
 
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -395,19 +385,23 @@ where
 
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -479,19 +473,23 @@ where
 
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -563,19 +561,23 @@ where
 
         // debug
         sp_runtime::print("----> exchange inherent asset balance, exchange paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(paired_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -651,33 +653,34 @@ where
         );
 
         // debug
-        sp_runtime::print(
-            "----> exchange a inherent asset balance, exchange a paired asset balance",
-        );
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone()))
-                .into();
+        sp_runtime::print("----> exchange a inherent asset balance, exchange a paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
-        sp_runtime::print(
-            "----> exchange b inherent asset balance, exchange b paired asset balance",
-        );
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone()))
-                .into();
+        sp_runtime::print("----> exchange b inherent asset balance, exchange b paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
-        sp_runtime::print("----> account asset a balance, account asset b balance");
-        let b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), input_account.clone())).into();
+        sp_runtime::print("----> account inherent asset balance, account paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), input_account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_b.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -758,33 +761,34 @@ where
         );
 
         // debug
-        sp_runtime::print(
-            "----> exchange a inherent asset balance, exchange a paired asset balance",
-        );
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone()))
-                .into();
+        sp_runtime::print("----> exchange a inherent asset balance, exchange a paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_a_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_a.clone(), exchange_a_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
-        sp_runtime::print(
-            "----> exchange b inherent asset balance, exchange b paired asset balance",
-        );
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone()))
-                .into();
+        sp_runtime::print("----> exchange b inherent asset balance, exchange b paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_b_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
-        sp_runtime::print("----> account asset a balance, account asset b balance");
-        let b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_a.clone(), input_account.clone())).into();
+        sp_runtime::print("----> account inherent asset balance, account paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_b.clone(), exchange_b_address.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_b.clone(), input_account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_b.clone(), input_account.clone())))
+            .ok()
+            .expect("Balance is u128"); 
         sp_runtime::print(paired_b as u64);
 
         Self::deposit_event(RawEvent::AssetsSwapped(
@@ -953,15 +957,24 @@ where
         }
 
         // TODO: calculate with fee rate
-        let input_volumn: u128 = input_amount.into();
-        let input_part_volumn: u128 = input_part_balance.into();
-        let output_part_volumn: u128 = output_part_balance.into();
+        let input_volumn = TryInto::<u128>::try_into(input_amount)
+            .ok()
+            .expect("Balance is u128");
+        let input_part_volumn = TryInto::<u128>::try_into(input_part_balance)
+            .ok()
+            .expect("Balance is u128");
+        let output_part_volumn = TryInto::<u128>::try_into(output_part_balance)
+            .ok()
+            .expect("Balance is u128");
 
         // XXX: check overflow
         let denominator: u128 = input_volumn + input_part_volumn;
         let output_volumn: u128 = output_part_volumn * input_volumn / denominator;
 
-        Ok(output_volumn.into())
+        let output_volumn = TryInto::<T::Balance>::try_into(output_volumn)
+            .ok()
+            .expect("Balance is u128");
+        Ok(output_volumn)
     }
 
     /// Give the exact known output, calculate the input
@@ -983,9 +996,15 @@ where
             return Ok(T::Balance::max_value());
         }
 
-        let output_volumn: u128 = output_amount.into();
-        let input_part_volumn: u128 = input_part_balance.into();
-        let output_part_volumn: u128 = output_part_balance.into();
+        let output_volumn = TryInto::<u128>::try_into(output_amount)
+            .ok()
+            .expect("Balance is u128");
+        let input_part_volumn = TryInto::<u128>::try_into(input_part_balance)
+            .ok()
+            .expect("Balance is u128");
+        let output_part_volumn = TryInto::<u128>::try_into(output_part_balance)
+            .ok()
+            .expect("Balance is u128");
 
         // XXX: check overflow
         let denominator: u128 = output_part_volumn - output_volumn;
@@ -993,7 +1012,10 @@ where
 
         // TODO: calculate with fee rate
 
-        Ok(input_volumn.into())
+        let input_volumn = TryInto::<T::Balance>::try_into(output_volumn)
+            .ok()
+            .expect("Balance is u128");
+        Ok(input_volumn)
     }
 
     /// Add liquidity
@@ -1069,25 +1091,35 @@ where
         <ExchangeAccounts<T>>::insert(asset_id.clone(), exchange_address.clone());
 
         // debug
-        sp_runtime::print("add liquidity  ----> Paired pool account liquidity");
-        let b: u128 = Self::account_liquidity(&(asset_id.clone(), account.clone())).into();
+        sp_runtime::print("_add_liquidity ----> Paired pool account liquidity");
+        let b = TryInto::<u128>::try_into(Self::account_liquidity(&(asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
-        sp_runtime::print("add liquidity ----> Paired pool total liquidity");
-        let b: u128 = Self::total_liquidity(asset_id.clone()).into();
+        sp_runtime::print("_add_liquidity ----> Paired pool total liquidity");
+        let b = TryInto::<u128>::try_into(Self::total_liquidity(asset_id.clone()))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
 
-        sp_runtime::print("add liquidity  ----> exchange inherent asset balance, exchange paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+        sp_runtime::print("_add_liquidity ----> exchange inherent asset balance, exchange paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), exchange_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(paired_b as u64);
 
-        sp_runtime::print("add liquidity  ----> account inherent asset balance, account paired asset balance");
-        let b: u128 = <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), account.clone())).into();
+        sp_runtime::print("----> account inherent asset balance, account paired asset balance");
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
-        let paired_b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(paired_b as u64);
 
         // emit event
@@ -1146,24 +1178,34 @@ where
 
         // debug
         sp_runtime::print("_remove_liquidity ----> Paired pool account liquidity");
-        let b: u128 = Self::account_liquidity(&(asset_id.clone(), account.clone())).into();
+        let b = TryInto::<u128>::try_into(Self::account_liquidity(&(asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
         sp_runtime::print("_remove_liquidity ----> Paired pool total liquidity");
-        let b: u128 = Self::total_liquidity(asset_id.clone()).into();
+        let b = TryInto::<u128>::try_into(Self::total_liquidity(asset_id.clone()))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
 
         sp_runtime::print("_remove_liquidity ----> exchange inherent asset balance, exchange paired asset balance");
-        let b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
-        let paired_b: u128 =
-            <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), exchange_address.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_id.clone(), exchange_address.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(paired_b as u64);
 
         sp_runtime::print("----> account inherent asset balance, account paired asset balance");
-        let b: u128 = <assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), account.clone())).into();
+        let b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(inherent_asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
-        let paired_b: u128 = <assets::Module<T>>::get_asset_balance(&(asset_id.clone(), account.clone())).into();
+        let paired_b = TryInto::<u128>::try_into(<assets::Module<T>>::get_asset_balance(&(asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(paired_b as u64);
 
         // emit event
@@ -1186,7 +1228,9 @@ where
 
         // debug
         sp_runtime::print("set_liquidity ----> Paired pool account liquidity");
-        let b: u128 = Self::account_liquidity(&(asset_id.clone(), account.clone())).into();
+        let b = TryInto::<u128>::try_into(Self::account_liquidity(&(asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
     }
 
@@ -1196,7 +1240,9 @@ where
     fn get_liquidity(asset_id: T::AssetId, account: T::AccountId) -> T::Balance {
         // debug
         sp_runtime::print("get_liquidity ----> Paired pool account liquidity");
-        let b: u128 = Self::account_liquidity(&(asset_id.clone(), account.clone())).into();
+        let b = TryInto::<u128>::try_into(Self::account_liquidity(&(asset_id.clone(), account.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
 
         <AccountLiquidities<T>>::get(&(asset_id, account))
@@ -1211,7 +1257,9 @@ where
 
         // debug
         sp_runtime::print("increase total liquidity ----> Paired pool total liquidity");
-        let b: u128 = Self::total_liquidity(asset_id.clone()).into();
+        let b = TryInto::<u128>::try_into(Self::total_liquidity(asset_id.clone()))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
     }
 
@@ -1224,7 +1272,9 @@ where
 
         // debug
         sp_runtime::print("decrease total liquidity ----> Paired pool total liquidity");
-        let b: u128 = Self::total_liquidity(asset_id.clone()).into();
+        let b = TryInto::<u128>::try_into(Self::total_liquidity(asset_id.clone()))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
     }
 
@@ -1233,7 +1283,9 @@ where
     fn get_total_liquidity(asset_id: T::AssetId) -> T::Balance {
         // debug
         sp_runtime::print("get total liquidity ----> Paired pool total liquidity");
-        let b: u128 = Self::total_liquidity(asset_id.clone()).into();
+        let b = TryInto::<u128>::try_into(Self::total_liquidity(asset_id.clone()))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
 
         <TotalLiquidities<T>>::get(asset_id)

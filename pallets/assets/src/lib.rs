@@ -7,7 +7,7 @@ use frame_support::{
 use sp_runtime::DispatchResult as Result;
 use frame_system::{self as system, ensure_signed};
 use sp_std::prelude::*;
-use sp_std::vec::Vec;
+use sp_std::{vec::Vec, convert::TryInto};
 use sp_runtime::traits::{
     Member, One, AtLeast32BitUnsigned, Zero,
 };
@@ -24,10 +24,7 @@ pub trait Trait: frame_system::Trait {
 
 decl_module! {
     pub struct Module<T: Trait> for enum Call where
-        origin: T::Origin,
-        u64: core::convert::From<<T as Trait>::AssetId>,
-        u128: core::convert::From<<T as Trait>::Balance>,
-    <T as Trait>::Balance: core::convert::From<u128>
+        origin: T::Origin
     {
 		fn deposit_event() = default;
 
@@ -43,9 +40,13 @@ decl_module! {
 
             // debug
             sp_runtime::print("----> asset id, total balance");
-            let idn: u64 = id.into();
+            let idn = TryInto::<u64>::try_into(id)
+                .ok()
+                .expect("id is u64");
             sp_runtime::print(idn);
-            let b: u128 = <Balances<T>>::get((id, origin.clone())).into();
+            let b = TryInto::<u128>::try_into(<Balances<T>>::get((id, origin.clone())))
+                .ok()
+                .expect("Balance is u128");
             sp_runtime::print(b as u64);
 
             Self::deposit_event(RawEvent::Issued(id, origin, total));
@@ -78,8 +79,11 @@ decl_module! {
 
             // debug
             sp_runtime::print("----> Inhere Asset Id");
-            let b: u64 = Self::inherent_asset_id().into();
-            sp_runtime::print(b);
+            
+            let idn = TryInto::<u64>::try_into(Self::inherent_asset_id())
+                .ok()  
+                .expect("id is u64");        
+            sp_runtime::print(idn);
 
             Ok(())
         }
@@ -116,10 +120,6 @@ decl_event! {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Assets
-    where
-        u64: core::convert::From<<T as Trait>::AssetId>,
-        u128: core::convert::From<<T as Trait>::Balance>,
-    <T as Trait>::Balance: core::convert::From<u128>
     {
         /// The next asset identifier up for grabs.
         NextAssetId get(fn next_asset_id): T::AssetId;
@@ -148,12 +148,7 @@ decl_storage! {
     }
 }
 
-impl<T: Trait> Module<T>
-where
-    u64: core::convert::From<<T as Trait>::AssetId>,
-    u128: core::convert::From<<T as Trait>::Balance>,
-    <T as Trait>::Balance: core::convert::From<u128>,
-{
+impl<T: Trait> Module<T> {
     /// Issue a new class of fungible assets. There are, and will only ever be, `total`
     /// such assets and they'll all belong to the `origin` initially. It will have an
     /// identifier `AssetId` instance: this will be specified in the `Issued` event.
@@ -169,9 +164,13 @@ where
 
         // debug
         sp_runtime::print("----> asset id, total balance");
-        let idn: u64 = id.into();
+        let idn = TryInto::<u64>::try_into(id)
+            .ok()
+            .expect("id is u64");        
         sp_runtime::print(idn);
-        let b: u128 = <Balances<T>>::get((id, account.clone())).into();
+        let b = TryInto::<u128>::try_into(<Balances<T>>::get((id, account.clone())))
+            .ok()
+            .expect("Balance is u128");        
         sp_runtime::print(b as u64);
 
         Self::deposit_event(RawEvent::Issued(id, account, total));
@@ -207,14 +206,16 @@ where
         ));
 
         sp_runtime::print("before transfer target balance ----> ");
-        let b: u128 =
-            Self::get_asset_balance(&(id.clone(), target.clone())).into();
+        let b = TryInto::<u128>::try_into(Self::get_asset_balance(&(id.clone(), target.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
         <Balances<T>>::insert(origin_account, origin_balance - amount);
         <Balances<T>>::mutate((id, target.clone()), |balance| *balance += amount);
         sp_runtime::print("after transfer target balance----> ");
-        let b: u128 =
-            Self::get_asset_balance(&(id.clone(), target)).into();
+        let b = TryInto::<u128>::try_into(Self::get_asset_balance(&(id.clone(), target)))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
         Ok(())
     }
@@ -225,7 +226,9 @@ where
     pub fn balance(id: T::AssetId, who: T::AccountId) -> T::Balance {
         // debug
         sp_runtime::print("----> Account Asset Balance");
-        let b: u128 = Self::get_asset_balance(&(id.clone(), who.clone())).into();
+        let b = TryInto::<u128>::try_into(Self::get_asset_balance(&(id.clone(), who.clone())))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
 
         <Balances<T>>::get((id, who))
@@ -236,9 +239,12 @@ where
     pub fn total_supply(id: T::AssetId) -> T::Balance {
         // debug
         sp_runtime::print("----> Asset Total Supply");
-        let b: u128 = Self::get_asset_total_supply(id.clone()).into();
+        let b = TryInto::<u128>::try_into(Self::get_asset_total_supply(id.clone()))
+            .ok()
+            .expect("Balance is u128");
         sp_runtime::print(b as u64);
 
         <TotalSupply<T>>::get(id)
     }
+
 }
