@@ -82,7 +82,7 @@ decl_event!(
     <T as assets::Trait>::Balance,
     <T as assets::Trait>::AssetId {
         /// Assets swap event
-        AssetsSwapped(AccountId, AssetId, Balance, AssetId, Balance),
+        Supplied(AssetId, AccountId, Balance),
 
     }
 );
@@ -91,19 +91,17 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as Lending
     {
-        pub UserDebts: double_map
+        pub UserDebts get(fn user_debt): double_map
         hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
         => Option<UserDebt<T>>;
 
-        pub UserSupplies: double_map
+        pub UserSupplies get(fn user_supply): double_map
         hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
         => Option<UserSupply<T>>;
 
         pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
 
         pub UserCollaterals: map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
-
-        Tether get(fn test): u32;
 
     }
 
@@ -131,14 +129,18 @@ decl_module! {
             Self::accrue_interest(asset_id);
             // 2 transfer asset
             <assets::Module<T>>::transfer(
-                account,
+                account.clone(), // TODO: use reference
                 asset_id,
                 Self::account_id(),
                 amount,
-            );
+            ); // TODO: check result
 
             // 3 update user supply
+            Self::update_user_supply(asset_id, account.clone(), amount, true);
             // 4 update pool supply
+            Self::update_pool_supply(asset_id, amount, true);
+
+            Self::deposit_event(RawEvent::Supplied(asset_id, account, amount));
 
             Ok(())
         }
@@ -260,7 +262,6 @@ impl<T: Trait> Module<T>
         if pool.last_updated == <frame_system::Module<T>>::block_number() {
             return
         }
-        // dealing with option
 
         // 3 get time span
         let interval_block_number = <frame_system::Module<T>>::block_number() - pool.last_updated;
@@ -306,6 +307,26 @@ impl<T: Trait> Module<T>
 
     fn get_user_total_collaterals(account: T::AccountId) -> T::Balance {
         T::Balance::default()
+    }
+
+    fn update_user_supply(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
+        let mut user_supply = Self::user_supply(asset_id, account).unwrap();
+        if positive {
+            user_supply.amount += amount;
+        } else {
+            user_supply.amount -= amount;
+        }
+    }
+
+    fn update_pool_supply(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
+        // TODO: error handle
+        let mut pool = Self::pool(asset_id).unwrap();
+        if positive {
+            pool.supply += amount;
+        } else {
+            pool.supply -= amount;
+        }
+        Pools::<T>::insert(asset_id, pool);
     }
 
 }
