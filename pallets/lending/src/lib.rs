@@ -21,6 +21,7 @@ use substrate_fixed::{
 // TODO: child storage
 // TODO: add events
 // TODO: U64F64 as type
+// TODO: reduce pool storage read
 
 const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 
@@ -63,7 +64,7 @@ pub struct UserSupply<T: Trait> {
 	/// Source of the swap.
 	pub amount: <T as assets::Trait>::Balance,
 	/// Action of this swap.
-    pub index: u64,
+    pub index: U64F64,
     
     pub as_collateral: bool,
 }
@@ -73,7 +74,7 @@ pub struct UserDebt<T: Trait> {
 	/// Source of the swap.
 	pub amount: <T as assets::Trait>::Balance,
 	/// Action of this swap.
-	pub index: u64,
+	pub index: U64F64,
 }
 
 decl_event!(
@@ -310,12 +311,28 @@ impl<T: Trait> Module<T>
     }
 
     fn update_user_supply(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
-        let mut user_supply = Self::user_supply(asset_id, account).unwrap();
+        let pool = Self::pool(asset_id).unwrap();
+
+        let mut user_supply = Self::user_supply(asset_id, account.clone()).unwrap();
+
+        let original_amount = TryInto::<u128>::try_into(user_supply.amount)
+            .ok()
+            .expect("Balance is u128");
+        let amount_with_interest = U64F64::from_num(original_amount) * pool.total_supply_index / user_supply.index;
+        let converted = u128::from_fixed(amount_with_interest);
+        user_supply.amount = TryInto::<T::Balance>::try_into(converted)
+            .ok()
+            .expect("Balance is u128");
+
+        user_supply.index = pool.total_supply_index;
+
         if positive {
             user_supply.amount += amount;
         } else {
             user_supply.amount -= amount;
         }
+        UserSupplies::<T>::insert(asset_id, account, user_supply);
+
     }
 
     fn update_pool_supply(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
