@@ -5,6 +5,7 @@ use frame_support::{
     StorageMap, StorageValue,
 };
 use sp_runtime::{DispatchResult as Result, RuntimeDebug};
+use sp_runtime::{traits::AccountIdConversion, ModuleId};
 use frame_system::{self as system, ensure_signed};
 use sp_std::prelude::*;
 use sp_std::{vec::Vec, convert::TryInto};
@@ -18,7 +19,10 @@ use substrate_fixed::{
 // TODO: fee, reserves
 // TODO: loose couple
 // TODO: child storage
+// TODO: add events
 // TODO: U64F64 as type
+
+const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 
 /// The module's configuration trait.
 pub trait Trait: assets::Trait {
@@ -126,6 +130,13 @@ decl_module! {
             // 1 accrue interest
             Self::accrue_interest(asset_id);
             // 2 transfer asset
+            <assets::Module<T>>::transfer(
+                account,
+                asset_id,
+                Self::account_id(),
+                amount,
+            );
+
             // 3 update user supply
             // 4 update pool supply
 
@@ -236,6 +247,11 @@ decl_module! {
 
 impl<T: Trait> Module<T>
 {
+
+    pub fn account_id() -> T::AccountId {
+		PALLET_ID.into_account()
+    }
+    
     fn accrue_interest(asset_id: T::AssetId) {
         // TODO avoid multi get pool
         // TODO use error of convert error
