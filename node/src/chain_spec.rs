@@ -156,11 +156,11 @@ fn testnet_genesis(
 		pallet_assets: Some(AssetsConfig {
             owner: get_account_id_from_seed::<sr25519::Public>("Bob"),
             assets: vec![
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000_000_000_000_000_000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
-                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000_000_000_000_000_000, 100_000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000, 60_000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000, 5_000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000, 600_000000),
+                (get_account_id_from_seed::<sr25519::Public>("Alice"), 1000000000000000000, 20000_000000),
             ],
 		}),
 		pallet_swap: Some(SwapConfig {

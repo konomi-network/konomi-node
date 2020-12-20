@@ -5,7 +5,7 @@ use frame_support::{
     StorageMap, StorageValue,
 };
 use sp_runtime::DispatchResult as Result;
-use frame_system::{self as system, ensure_signed};
+use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_std::prelude::*;
 use sp_std::{vec::Vec, convert::TryInto};
 use sp_runtime::traits::{
@@ -100,6 +100,13 @@ decl_module! {
 
             Ok(())
         }
+
+        #[weight = 1]
+        pub fn set_price(origin, id: T::AssetId, price: T::Balance) -> Result {
+            ensure_root(origin)?;
+            Self::_set_price(id, price);
+            Ok(())
+        }
 	}
 }
 
@@ -124,25 +131,28 @@ decl_storage! {
         /// The next asset identifier up for grabs.
         NextAssetId get(fn next_asset_id): T::AssetId;
         /// The total unit supply of an asset.
-        TotalSupply get(fn get_asset_total_supply): map hasher(blake2_128_concat) T::AssetId => T::Balance;
+        TotalSupply get(fn get_asset_total_supply): map hasher(twox_64_concat) T::AssetId => T::Balance;
         /// The number of units of assets held by any given account.
         Balances get(fn get_asset_balance): map hasher(blake2_128_concat) (T::AssetId, T::AccountId) => T::Balance;
         /// The default inherent asset in this platform
         InherentAsset get(fn inherent_asset_id): T::AssetId;
+        /// Price of the asset (base is 1000000)
+        Price get(fn price): map hasher(twox_64_concat) T::AssetId => T::Balance;
         /// for test only
         Owner get(fn owner) config(): T::AccountId;
     }
     
     add_extra_genesis {
-        config(assets): Vec<(T::AccountId, T::Balance)>;
+        config(assets): Vec<(T::AccountId, T::Balance, T::Balance)>;
 
         build(|config: &GenesisConfig<T>| {
             for asset in config.assets.iter() {
-                let (account, amount) = asset;
+                let (account, amount, price) = asset;
                 <Module<T>>::_issue(account.clone(), amount.clone());
                 let to_account = <Owner<T>>::get();
                 let asset_id = <NextAssetId<T>>::get() - 1.into();
                 <Module<T>>::transfer(account.clone(), asset_id, to_account, 50000.into());
+                <Module<T>>::_set_price(asset_id, *price);
             }
         })
     }
@@ -176,6 +186,10 @@ impl<T: Trait> Module<T> {
         Self::deposit_event(RawEvent::Issued(id, account, total));
 
         Ok(())
+    }
+
+    fn _set_price(id: T::AssetId, price: T::Balance) {
+        <Price<T>>::insert(id, price);
     }
 
     /// Move some assets from one holder to another.
