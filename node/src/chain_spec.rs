@@ -1,7 +1,7 @@
 use sp_core::{Pair, Public, sr25519};
 use konomi_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature, AssetsConfig, SwapConfig
+	SudoConfig, SystemConfig, WASM_BINARY, Signature, AssetsConfig, SwapConfig, LendingConfig
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -166,6 +166,10 @@ fn testnet_genesis(
 		pallet_swap: Some(SwapConfig {
 			// Assign network admin rights.
             fee_rate: 1,
+		}),
+		pallet_lending: Some(LendingConfig {
+			// Assign network admin rights.
+            pools: vec![0, 1, 2, 3, 4],
 		}),
 	}
 }

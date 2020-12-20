@@ -297,7 +297,7 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
 		Assets: pallet_assets::{Module, Call, Storage, Config<T>, Event<T>},		
 		Swap: pallet_swap::{Module, Call, Storage, Config<T>, Event<T>},
-		Lending: pallet_lending::{Module, Call, Storage, Event<T>},
+		Lending: pallet_lending::{Module, Call, Storage, Config<T>, Event<T>},
 	}
 );
 

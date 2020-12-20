@@ -6,7 +6,7 @@ use frame_support::{
 };
 use sp_runtime::{
     DispatchResult as Result, RuntimeDebug,
-    traits::AccountIdConversion, ModuleId
+    traits::{AccountIdConversion, Zero}, ModuleId
 };
 use frame_system::{self as system, ensure_signed};
 use sp_std::prelude::*;
@@ -71,13 +71,10 @@ pub struct User<T: Trait> {
 	/// Source of the swap.
 	pub borrow_limit: T::Balance,
 	/// Action of this swap.
-    pub borrow_limit_used: T::Balance,
 
     pub supply_balance: T::Balance,
 
     pub debt_balance: T::Balance,
-
-    pub total_collateral_value: T::Balance
 
 }
 
@@ -104,8 +101,14 @@ decl_event!(
     where <T as system::Trait>::AccountId,
     <T as assets::Trait>::Balance,
     <T as assets::Trait>::AssetId {
-        /// Assets swap event
+
         Supplied(AssetId, AccountId, Balance),
+
+        Withdrawn(AssetId, AccountId, Balance),
+
+        Borrowed(AssetId, AccountId, Balance),
+
+        Repaid(AssetId, AccountId, Balance),
 
     }
 );
@@ -124,15 +127,29 @@ decl_storage! {
 
         pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
 
-        pub UserCollaterals: map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
+        pub Users get(fn user): map hasher(blake2_128_concat) T::AccountId => Option<User<T>>;
 
+        pub UserSupplySet get(fn user_supply_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
+        pub UserDebtSet get(fn user_debt_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
+    }
+
+    add_extra_genesis {
+        config(pools): Vec<(T::AssetId)>;
+
+        build(|config: &GenesisConfig<T>| {
+            for pool in config.pools.iter() {
+                <Module<T>>::_init_pool(*pool, true);
+            }
+        })
     }
 
 }
 
 decl_error! {
 	pub enum Error for Module<T: Trait> {
-		TransferFailed,
+        TransferFailed,
+        NotEnoughLiquidity,
+        InsufficientCollateral,
 	}
 }
 
@@ -162,15 +179,23 @@ decl_module! {
                 asset_id,
                 Self::account_id(),
                 amount,
-            ).map_err(|_| Error::<T>::TransferFailed)?; // TODO: check result
+            ).map_err(|_| Error::<T>::TransferFailed)?;
 
             // 3 update user supply
             Self::update_user_supply(asset_id, account.clone(), amount, true);
             // 4 update pool supply
             Self::update_pool_supply(asset_id, amount, true);
 
-            Self::deposit_event(RawEvent::Supplied(asset_id, account, amount));
+            Self::deposit_event(RawEvent::Supplied(asset_id, account.clone(), amount));
 
+            let mut assets = Self::user_supply_set(account.clone());
+            if !assets.iter().any(|x| *x == asset_id) {
+                assets.push(asset_id);
+                UserSupplySet::<T>::insert(account.clone(), assets);
+            }
+
+            Self::update_apys(asset_id);
+            Self::_update_user(account);
             Ok(())
         }
 
@@ -184,10 +209,33 @@ decl_module! {
             // TODO check pool exists
             // 1 accrue interest
             Self::accrue_interest(asset_id);
-            // 2 check collateral and pool cash = (deposit - borrow)
-            // 3 update user supply
-            // 4 transfer asset to user
+            // 2 check collateral 
+            
+            
+            // 3 check pool cash = (deposit - borrow) > amount
+            let pool = Self::pool(asset_id).unwrap();
+            if (pool.supply - pool.debt) < amount {
+                Err(Error::<T>::NotEnoughLiquidity)?
+            }
 
+            // 4 transfer asset to user
+            <assets::Module<T>>::transfer(
+                Self::account_id(),
+                asset_id,
+                account.clone(),
+                amount,
+            ).map_err(|_| Error::<T>::TransferFailed)?;
+
+            // 5 update user supply
+            Self::update_user_supply(asset_id, account.clone(), amount, false);
+
+            // 6 update pool supply
+            Self::update_pool_supply(asset_id, amount, false);
+
+            Self::deposit_event(RawEvent::Withdrawn(asset_id, account.clone(), amount));
+
+            Self::update_apys(asset_id);
+            Self::_update_user(account);
             Ok(())
         }
 
@@ -202,9 +250,34 @@ decl_module! {
             // 1 accrue interest
             Self::accrue_interest(asset_id);
             // 2 check collateral
-            // 3 update user Borrow
-            // 4 update pool borrow
-            // 5 transfer asset to user
+
+            // 3 check pool cash = (deposit - borrow) > amount
+            let pool = Self::pool(asset_id).unwrap();
+            if (pool.supply - pool.debt) < amount {
+                Err(Error::<T>::NotEnoughLiquidity)?
+            }
+
+            // 4 transfer asset to user
+            <assets::Module<T>>::transfer(
+                Self::account_id(),
+                asset_id,
+                account.clone(),
+                amount,
+            ).map_err(|_| Error::<T>::TransferFailed)?;
+            // 5 update user Borrow
+            Self::update_user_debt(asset_id, account.clone(), amount, true);
+            // 6 update pool borrow
+            Self::update_pool_debt(asset_id, amount, true);
+
+            Self::deposit_event(RawEvent::Borrowed(asset_id, account.clone(), amount));
+
+            let mut assets = Self::user_debt_set(account.clone());
+            if !assets.iter().any(|x| *x == asset_id) {
+                assets.push(asset_id);
+                UserDebtSet::<T>::insert(account.clone(), assets);
+            }
+            Self::update_apys(asset_id);
+            Self::_update_user(account);
             Ok(())
         }
 
@@ -219,9 +292,21 @@ decl_module! {
             // 1 accrue interest
             Self::accrue_interest(asset_id);
             // 2 transfer token from user
-            // 3 update user borrow: if all loan is repaid, clean up the loan
+            <assets::Module<T>>::transfer(
+                account.clone(), // TODO: use reference
+                asset_id,
+                Self::account_id(),
+                amount,
+            ).map_err(|_| Error::<T>::TransferFailed)?;
+            // 3 update user Borrow
+            Self::update_user_debt(asset_id, account.clone(), amount, false);
             // 4 update pool borrow
+            Self::update_pool_debt(asset_id, amount, false);
 
+            Self::deposit_event(RawEvent::Repaid(asset_id, account.clone(), amount));
+
+            Self::update_apys(asset_id);
+            Self::_update_user(account);
             Ok(())
         }
 
@@ -270,6 +355,8 @@ decl_module! {
             id: T::AssetId,
             can_be_collateral: bool
         ) -> Result {
+
+            Self::_init_pool(id, can_be_collateral);
 
             Ok(())
         }
@@ -328,64 +415,117 @@ impl<T: Trait> Module<T>
     }
 
     fn get_debt_rate(asset_id: T::AssetId) -> U64F64 {
-        U64F64::from_num(1)
+        let utilization_optimal = U64F64::from_num(1) / 2;
+        let borrow_rate_net1 = U64F64::from_num(7) / 100;
+        let borrow_rate_net2 = U64F64::from_num(14) / 100;
+        let borrow_rate_zero = U64F64::from_num(5) / 100;
+        let borrow_rate_optimal = U64F64::from_num(10) / 100;
+
+        let pool = Self::pool(asset_id).unwrap();
+        let debt = TryInto::<u128>::try_into(pool.debt)
+            .ok()
+            .expect("Balance is u128");
+        let supply = TryInto::<u128>::try_into(pool.supply)
+            .ok()
+            .expect("Balance is u128");
+
+        let utilization_ratio = U64F64::from_num(debt) / supply;
+        if (utilization_ratio <= utilization_optimal) {
+            return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
+        } else {
+            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) /  borrow_rate_optimal;
+        }
     }
 
     fn get_supply_rate(asset_id: T::AssetId) -> U64F64 {
-        U64F64::from_num(1)
+        let utilization_optimal = U64F64::from_num(1) / 2;
+        let borrow_rate_net1 = U64F64::from_num(7) / 100;
+        let borrow_rate_net2 = U64F64::from_num(14) / 100;
+        let borrow_rate_zero = U64F64::from_num(5) / 100;
+        let borrow_rate_optimal = U64F64::from_num(10) / 100;
+
+        let pool = Self::pool(asset_id).unwrap();
+        let debt = TryInto::<u128>::try_into(pool.debt)
+            .ok()
+            .expect("Balance is u128");
+        let supply = TryInto::<u128>::try_into(pool.supply)
+            .ok()
+            .expect("Balance is u128");
+
+        let utilization_ratio = U64F64::from_num(debt) / supply;
+        if (utilization_ratio <= utilization_optimal) {
+            return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
+        } else {
+            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) /  borrow_rate_optimal) * utilization_ratio;
+        }
     }
 
-    fn get_user_total_collaterals(account: T::AccountId) -> T::Balance {
-        T::Balance::default()
-    }
-
+    // TODO: if final amount = 0, clean up
+    // TODO: return the actual - value if clean up
     fn update_user_supply(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
         let pool = Self::pool(asset_id).unwrap();
 
-        let mut user_supply = Self::user_supply(asset_id, account.clone()).unwrap();
+        if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
+            let original_amount = TryInto::<u128>::try_into(user_supply.amount)
+                .ok()
+                .expect("Balance is u128");
+            let amount_with_interest = U64F64::from_num(original_amount) * pool.total_supply_index / user_supply.index;
+            let converted = u128::from_fixed(amount_with_interest);
+            user_supply.amount = TryInto::<T::Balance>::try_into(converted)
+                .ok()
+                .expect("Balance is u128");
 
-        let original_amount = TryInto::<u128>::try_into(user_supply.amount)
-            .ok()
-            .expect("Balance is u128");
-        let amount_with_interest = U64F64::from_num(original_amount) * pool.total_supply_index / user_supply.index;
-        let converted = u128::from_fixed(amount_with_interest);
-        user_supply.amount = TryInto::<T::Balance>::try_into(converted)
-            .ok()
-            .expect("Balance is u128");
+            user_supply.index = pool.total_supply_index;
 
-        user_supply.index = pool.total_supply_index;
-
-        if positive {
-            user_supply.amount += amount;
+            if positive {
+                user_supply.amount += amount;
+            } else {
+                user_supply.amount -= amount;
+            }
+            UserSupplies::<T>::insert(asset_id, account, user_supply);
         } else {
-            user_supply.amount -= amount;
+            let user_supply = UserSupply::<T> {
+                amount,
+                index: pool.total_supply_index,
+                as_collateral: true,
+            };
+            UserSupplies::<T>::insert(asset_id, account, user_supply);
         }
-        UserSupplies::<T>::insert(asset_id, account, user_supply);
+
+
 
     }
 
+    // TODO: if final amount = 0, clean up
+    // TODO: return the actual - value if clean up
     fn update_user_debt(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
         let pool = Self::pool(asset_id).unwrap();
 
-        let mut user_debt = Self::user_debt(asset_id, account.clone()).unwrap();
+        if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
+            let original_amount = TryInto::<u128>::try_into(user_debt.amount)
+                .ok()
+                .expect("Balance is u128");
+            let amount_with_interest = U64F64::from_num(original_amount) * pool.total_debt_index / user_debt.index;
+            let converted = u128::from_fixed(amount_with_interest);
+            user_debt.amount = TryInto::<T::Balance>::try_into(converted)
+                .ok()
+                .expect("Balance is u128");
 
-        let original_amount = TryInto::<u128>::try_into(user_debt.amount)
-            .ok()
-            .expect("Balance is u128");
-        let amount_with_interest = U64F64::from_num(original_amount) * pool.total_debt_index / user_debt.index;
-        let converted = u128::from_fixed(amount_with_interest);
-        user_debt.amount = TryInto::<T::Balance>::try_into(converted)
-            .ok()
-            .expect("Balance is u128");
+            user_debt.index = pool.total_debt_index;
 
-        user_debt.index = pool.total_debt_index;
-
-        if positive {
-            user_debt.amount += amount;
+            if positive {
+                user_debt.amount += amount;
+            } else {
+                user_debt.amount -= amount;
+            }
+            UserDebts::<T>::insert(asset_id, account, user_debt);
         } else {
-            user_debt.amount -= amount;
+            let user_debt = UserDebt::<T> {
+                amount,
+                index: pool.total_debt_index,
+            };
+            UserDebts::<T>::insert(asset_id, account, user_debt);
         }
-        UserDebts::<T>::insert(asset_id, account, user_debt);
     }
 
     fn update_pool_supply(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
@@ -399,11 +539,22 @@ impl<T: Trait> Module<T>
         Pools::<T>::insert(asset_id, pool);
     }
 
+    fn update_pool_debt(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
+        // TODO: error handle
+        let mut pool = Self::pool(asset_id).unwrap();
+        if positive {
+            pool.debt += amount;
+        } else {
+            pool.debt -= amount;
+        }
+        Pools::<T>::insert(asset_id, pool);
+    }
+
     // tmp
     fn update_apys(asset_id: T::AssetId) {
 
-        const BASE: u32 = 1000000;
-        const BLOCK_PER_YEAR: u32 = 6*60*24*365;
+        const BASE: u64 = 1000000;
+        const BLOCK_PER_YEAR: u64 = 10*60*24*365;
 
         let mut pool = Self::pool(asset_id).unwrap();
         let supply_rate = Self::get_supply_rate(asset_id);
@@ -421,6 +572,55 @@ impl<T: Trait> Module<T>
             .expect("Balance is u128");
 
         Pools::<T>::insert(asset_id, pool);
+    }
+
+    fn _init_pool(id: T::AssetId, can_be_collateral: bool) {
+
+        let pool = Pool::<T> {
+            enabled: true,
+            can_be_collateral,
+            asset: id,
+            supply: T::Balance::zero(),
+            debt: T::Balance::zero(),
+            liquidation_threshold: U64F64::from_num(12) / 5,
+            supply_threshold: U64F64::from_num(3) / 2,
+            liquidation_bonus: U64F64::from_num(1) / 2,
+            total_supply_index: U64F64::from_num(1),
+            total_debt_index: U64F64::from_num(1),
+            last_updated: <frame_system::Module<T>>::block_number(),
+            supply_apy: T::Balance::zero(), // tmp
+            debt_apy: T::Balance::zero() // tmp
+        };
+
+        Pools::<T>::insert(id, pool);
+    }
+
+    fn _update_user(account: T::AccountId) {
+
+        let mut supply_balance = T::Balance::zero();
+        let mut borrow_limit = T::Balance::zero();
+        for asset in Self::user_supply_set(account.clone()).into_iter() {
+            let amount = Self::user_supply(asset, account.clone()).unwrap().amount;
+            let price = <assets::Module<T>>::price(asset);
+            supply_balance += amount * price / T::Balance::from(1000000);
+            borrow_limit += amount * price / T::Balance::from(1000000) * T::Balance::from(10) / T::Balance::from(15);
+        }
+
+        let mut debt_balance = T::Balance::zero();
+        for asset in Self::user_debt_set(account.clone()).into_iter() {
+            let amount = Self::user_debt(asset, account.clone()).unwrap().amount;
+            let price = <assets::Module<T>>::price(asset);
+            debt_balance += amount * price / T::Balance::from(1000000);
+        }
+
+        let user = User::<T> {
+            borrow_limit,
+            supply_balance,
+            debt_balance,
+        };
+
+        Users::<T>::insert(account, user);
+
     }
 
 }
