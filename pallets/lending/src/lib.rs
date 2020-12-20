@@ -388,27 +388,29 @@ impl<T: Trait> Module<T>
         let elapsed_time_U64F64 = U64F64::from_num(elapsed_time_u32);
 
         // 4  get rates and calculate interest
-        let new_total_supply_index = Self::get_supply_rate(asset_id) * elapsed_time_U64F64 * pool.total_supply_index;
-        let new_total_debt_index = Self::get_debt_rate(asset_id) * elapsed_time_U64F64 * pool.total_debt_index;
+        let supply_multiplier = U64F64::from_num(1) + Self::get_supply_rate(asset_id) * elapsed_time_U64F64;
+        let debt_multiplier = U64F64::from_num(1) + Self::get_debt_rate(asset_id) * elapsed_time_U64F64;
 
         // 5 update pool index, supply, debt, timestamp
         let supply = TryInto::<u128>::try_into(pool.supply)
             .ok()
             .expect("Balance is u128");
-        let supply = supply * new_total_supply_index;
+        let supply = supply * supply_multiplier;
         let converted = u128::from_fixed(supply);
         pool.supply = TryInto::<T::Balance>::try_into(converted)
             .ok()
             .expect("Balance is u128");
+        pool.total_supply_index *= supply_multiplier;
 
         let debt = TryInto::<u128>::try_into(pool.debt)
             .ok()
             .expect("Balance is u128");
-        let debt = debt * new_total_supply_index;
+        let debt = debt * debt_multiplier;
         let converted = u128::from_fixed(debt);
         pool.debt = TryInto::<T::Balance>::try_into(converted)
             .ok()
             .expect("Balance is u128");
+        pool.total_debt_index *= debt_multiplier;
 
         Pools::<T>::insert(asset_id, pool);
 
@@ -429,7 +431,12 @@ impl<T: Trait> Module<T>
             .ok()
             .expect("Balance is u128");
 
-        let utilization_ratio = U64F64::from_num(debt) / supply;
+        let utilization_ratio;
+        if supply == 0 {
+            utilization_ratio = U64F64::from_num(0);
+        } else {
+            utilization_ratio = U64F64::from_num(debt) / supply;
+        }
         if (utilization_ratio <= utilization_optimal) {
             return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
         } else {
@@ -451,8 +458,12 @@ impl<T: Trait> Module<T>
         let supply = TryInto::<u128>::try_into(pool.supply)
             .ok()
             .expect("Balance is u128");
-
-        let utilization_ratio = U64F64::from_num(debt) / supply;
+        let utilization_ratio;
+        if supply == 0 {
+            utilization_ratio = U64F64::from_num(0);
+        } else {
+            utilization_ratio = U64F64::from_num(debt) / supply;
+        }
         if (utilization_ratio <= utilization_optimal) {
             return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
         } else {
@@ -491,8 +502,6 @@ impl<T: Trait> Module<T>
             };
             UserSupplies::<T>::insert(asset_id, account, user_supply);
         }
-
-
 
     }
 
