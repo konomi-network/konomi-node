@@ -57,8 +57,28 @@ pub struct Pool<T: Trait> {
 
     pub total_debt_index: U64F64,
 
-    pub last_updated: T::BlockNumber // TODO: considering timestamp?
+    pub last_updated: T::BlockNumber, // TODO: considering timestamp?
+
+    pub supply_apy: T::Balance, // tmp
+
+    pub debt_apy: T::Balance // tmp
     
+}
+
+// tmp
+#[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
+pub struct User<T: Trait> {
+	/// Source of the swap.
+	pub borrow_limit: T::Balance,
+	/// Action of this swap.
+    pub borrow_limit_used: T::Balance,
+
+    pub supply_balance: T::Balance,
+
+    pub debt_balance: T::Balance,
+
+    pub total_collateral_value: T::Balance
+
 }
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
@@ -259,7 +279,7 @@ decl_module! {
 impl<T: Trait> Module<T>
 {
 
-    pub fn account_id() -> T::AccountId {
+    fn account_id() -> T::AccountId {
 		PALLET_ID.into_account()
     }
     
@@ -376,6 +396,30 @@ impl<T: Trait> Module<T>
         } else {
             pool.supply -= amount;
         }
+        Pools::<T>::insert(asset_id, pool);
+    }
+
+    // tmp
+    fn update_apys(asset_id: T::AssetId) {
+
+        const BASE: u32 = 1000000;
+        const BLOCK_PER_YEAR: u32 = 6*60*24*365;
+
+        let mut pool = Self::pool(asset_id).unwrap();
+        let supply_rate = Self::get_supply_rate(asset_id);
+        let debt_rate = Self::get_debt_rate(asset_id);
+    
+        let supply_apy = supply_rate * U64F64::from_num(BLOCK_PER_YEAR * BASE);
+        let debt_apy = debt_rate * U64F64::from_num(BLOCK_PER_YEAR * BASE);
+
+        pool.supply_apy = TryInto::<T::Balance>::try_into(u128::from_fixed(supply_apy))
+            .ok()
+            .expect("Balance is u128");
+
+        pool.debt_apy = TryInto::<T::Balance>::try_into(u128::from_fixed(debt_apy))
+            .ok()
+            .expect("Balance is u128");
+
         Pools::<T>::insert(asset_id, pool);
     }
 
