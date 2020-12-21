@@ -209,7 +209,7 @@ decl_module! {
             // TODO check pool exists
             // 1 accrue interest
             Self::accrue_interest(asset_id);
-            // 2 check collateral 
+            // 2 check collateral TODO need to first update user's supply to check the latest ratio...
             
             // pre-check amount
             let mut amount = amount;
@@ -434,10 +434,10 @@ impl<T: Trait> Module<T>
 
     fn get_debt_rate(asset_id: T::AssetId) -> U64F64 {
         let utilization_optimal = U64F64::from_num(1) / 2;
-        let borrow_rate_net1 = U64F64::from_num(7) / 100;
-        let borrow_rate_net2 = U64F64::from_num(14) / 100;
-        let borrow_rate_zero = U64F64::from_num(5) / 100;
-        let borrow_rate_optimal = U64F64::from_num(10) / 100;
+        let borrow_rate_net1 = U64F64::from_num(7) / 100 / 2000000;
+        let borrow_rate_net2 = U64F64::from_num(14) / 100 / 2000000;
+        let borrow_rate_zero = U64F64::from_num(5) / 100 / 2000000;
+        let borrow_rate_optimal = U64F64::from_num(10) / 100 / 2000000;
 
         let pool = Self::pool(asset_id).unwrap();
         let debt = TryInto::<u128>::try_into(pool.debt)
