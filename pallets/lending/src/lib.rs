@@ -211,7 +211,14 @@ decl_module! {
             Self::accrue_interest(asset_id);
             // 2 check collateral 
             
-            
+            // pre-check amount
+            let mut amount = amount;
+            if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
+                if user_supply.amount < amount {
+                    amount = user_supply.amount;
+                }
+            }
+
             // 3 check pool cash = (deposit - borrow) > amount
             let pool = Self::pool(asset_id).unwrap();
             if (pool.supply - pool.debt) < amount {
@@ -298,6 +305,15 @@ decl_module! {
                 Self::account_id(),
                 amount,
             ).map_err(|_| Error::<T>::TransferFailed)?;
+
+            // pre-check amount
+            let mut amount = amount;
+            if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
+                if user_debt.amount < amount {
+                    amount = user_debt.amount;
+                }
+            }
+
             // 3 update user Borrow
             Self::update_user_debt(asset_id, account.clone(), amount, false);
             // 4 update pool borrow
