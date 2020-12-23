@@ -456,7 +456,7 @@ impl<T: Trait> Module<T>
         if (utilization_ratio <= utilization_optimal) {
             return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
         } else {
-            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) /  borrow_rate_optimal;
+            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) +  borrow_rate_optimal;
         }
     }
 
@@ -483,7 +483,7 @@ impl<T: Trait> Module<T>
         if (utilization_ratio <= utilization_optimal) {
             return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
         } else {
-            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) /  borrow_rate_optimal) * utilization_ratio;
+            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;
         }
     }
 
