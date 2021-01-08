@@ -212,6 +212,7 @@ decl_module! {
             // 2 check collateral TODO need to first update user's supply to check the latest ratio...
             
             // pre-check amount
+            // TODO: what if user supply is zero?
             let mut amount = amount;
             if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
                 if user_supply.amount < amount {
