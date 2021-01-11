@@ -2390,6 +2390,7 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder-runner",
+ "traits",
 ]
 
 [[package]]
@@ -3462,6 +3463,7 @@ dependencies = [
  "sp-core",
  "sp-runtime",
  "sp-std",
+ "traits",
 ]
 
 [[package]]
@@ -3568,6 +3570,7 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "substrate-fixed",
+ "traits",
 ]
 
 [[package]]
@@ -7256,6 +7259,10 @@ dependencies = [
  "tracing-log",
  "tracing-serde",
 ]
+
+[[package]]
+name = "traits"
+version = "2.0.0"
 
 [[package]]
 name = "trie-db"

@@ -11,6 +11,7 @@ use sp_std::{vec::Vec, convert::TryInto};
 use sp_runtime::traits::{
     Member, One, AtLeast32BitUnsigned, Zero,
 };
+use traits::Oracle;
 
 /// The module configuration trait.
 pub trait Trait: frame_system::Trait {
@@ -261,4 +262,10 @@ impl<T: Trait> Module<T> {
         <TotalSupply<T>>::get(id)
     }
 
+}
+
+impl<T: Trait> Oracle<T::AssetId, T::Balance> for Module<T> {
+    fn get_rate(asset_id: T::AssetId) -> T::Balance {
+        Self::price(asset_id)
+    }
 }

@@ -56,6 +56,7 @@ sp-session = { default-features = false, version = '2.0.0' }
 sp-std = { default-features = false, version = '2.0.0' }
 sp-transaction-pool = { default-features = false, version = '2.0.0' }
 sp-version = { default-features = false, version = '2.0.0' }
+traits = { path = '../pallets/traits', default-features = false, version = '2.0.0'}
 
 [features]
 default = ['std']
@@ -97,4 +98,5 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    'traits/std',
 ]

@@ -22,6 +22,7 @@ use pallet_grandpa::fg_primitives;
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
+use traits::Oracle;
 
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
@@ -278,6 +279,7 @@ impl pallet_swap::Trait for Runtime {
 
 impl pallet_lending::Trait for Runtime {
 	type Event = Event;
+	type Oracle = Assets;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

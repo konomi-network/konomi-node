@@ -17,6 +17,7 @@ use substrate_fixed::{
     types::U64F64,
     traits::FromFixed
 };
+use traits::Oracle;
 
 // TODO: fee, reserves
 // TODO: loose couple
@@ -31,6 +32,8 @@ const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 pub trait Trait: assets::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+
+    type Oracle: Oracle<Self::AssetId, Self::Balance>;
 }
 
 
@@ -41,7 +44,7 @@ pub struct Pool<T: Trait> {
 
     pub can_be_collateral: bool,
 
-	pub asset: <T as assets::Trait>::AssetId,
+	pub asset: T::AssetId,
 
 	pub supply: T::Balance,
 
@@ -627,7 +630,7 @@ impl<T: Trait> Module<T>
         let mut borrow_limit = T::Balance::zero();
         for asset in Self::user_supply_set(account.clone()).into_iter() {
             let amount = Self::user_supply(asset, account.clone()).unwrap().amount;
-            let price = <assets::Module<T>>::price(asset);
+            let price = T::Oracle::get_rate(asset);
             supply_balance += amount * price / T::Balance::from(1000000);
             borrow_limit += amount * price / T::Balance::from(1000000) * T::Balance::from(10) / T::Balance::from(15);
         }
@@ -635,7 +638,7 @@ impl<T: Trait> Module<T>
         let mut debt_balance = T::Balance::zero();
         for asset in Self::user_debt_set(account.clone()).into_iter() {
             let amount = Self::user_debt(asset, account.clone()).unwrap().amount;
-            let price = <assets::Module<T>>::price(asset);
+            let price = T::Oracle::get_rate(asset);
             debt_balance += amount * price / T::Balance::from(1000000);
         }
 
