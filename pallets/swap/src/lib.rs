@@ -257,6 +257,9 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
+    pub fn get_sum() -> u32 {
+        5
+    }
     /// Input inherent asset, output paired asset, with exact input amount
     /// @input_account    The account to send inherent asset to paired pool
     /// @output_account   The account to receive paired asset from paired pool

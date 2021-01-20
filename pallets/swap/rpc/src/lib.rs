@@ -22,6 +22,12 @@ pub trait SwapApi<BlockHash, AssetId, Balance> {
         amount_in: Balance,
         at: Option<BlockHash>
     ) -> Result<Balance>;
+
+    #[rpc(name = "swap_getSum")]
+    fn get_sum(
+        &self,
+        at: Option<BlockHash>
+    ) -> Result<u32>;
 }
 
 /// A struct that implements the `SumStorageApi`.
@@ -65,6 +71,25 @@ where
 
         let runtime_api_result = api.calculate_output(
             &at, in_id, out_id, amount_in);
+        runtime_api_result.map_err(|e| RpcError {
+            code: ErrorCode::ServerError(9876), // No real reason for this value
+            message: "Something wrong".into(),
+            data: Some(format!("{:?}", e).into()),
+        })
+    }
+
+    fn get_sum(
+        &self,
+        at: Option<<Block as BlockT>::Hash>
+    ) -> Result<u32> {
+
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(||
+            // If the block hash is not supplied assume the best block.
+            self.client.info().best_hash
+        ));
+
+        let runtime_api_result = api.get_sum(&at);
         runtime_api_result.map_err(|e| RpcError {
             code: ErrorCode::ServerError(9876), // No real reason for this value
             message: "Something wrong".into(),

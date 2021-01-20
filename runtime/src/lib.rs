@@ -463,6 +463,10 @@ impl_runtime_apis! {
 	impl pallet_swap_rpc_runtime_api::SwapApi<Block, AssetId, Balance> for Runtime {
         fn calculate_output(in_id: AssetId, out_id: AssetId, amount_in: Balance) -> Balance {
             Swap::calculate_output(in_id, out_id, amount_in)
+		}
+		
+		fn get_sum() -> u32 {
+            Swap::get_sum()
         }
     }
 

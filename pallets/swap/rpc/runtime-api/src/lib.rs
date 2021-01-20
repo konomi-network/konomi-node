@@ -7,5 +7,7 @@ sp_api::decl_runtime_apis! {
         Balance: Codec 
     {
         fn calculate_output(in_id: AssetId, out_id: AssetId, amount_in: Balance) -> Balance;
+
+        fn get_sum() -> u32;
     }
 }
