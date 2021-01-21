@@ -25,7 +25,6 @@ sp-core = { default-features = false, version = '2.0.1' }
 sp-runtime = { default-features = false, version = '2.0.1' }
 pallet-assets = { path = '../assets', default-features = false, version = '2.0.1' }
 traits = { path = '../traits', default-features = false, version = '2.0.1'}
-substrate-fixed = { git = 'https://github.com/encointer/substrate-fixed.git', tag = "v0.5.4+sub_v0.1" }
 
 [features]
 default = ['std']

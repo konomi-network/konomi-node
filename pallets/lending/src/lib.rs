@@ -5,6 +5,7 @@ use frame_support::{
     StorageMap, StorageValue,
 };
 use sp_runtime::{
+    FixedU128, FixedPointNumber, FixedPointOperand,
     DispatchResult as Result, RuntimeDebug,
     traits::{AccountIdConversion, Zero}, ModuleId
 };
@@ -13,10 +14,6 @@ use sp_std::prelude::*;
 use sp_std::{vec::Vec, convert::TryInto};
 use pallet_assets as assets;
 use codec::{Encode, Decode};
-use substrate_fixed::{
-    types::U64F64,
-    traits::FromFixed
-};
 use traits::Oracle;
 
 // TODO: fee, reserves
@@ -50,15 +47,15 @@ pub struct Pool<T: Trait> {
 
     pub debt: T::Balance,
 
-    pub liquidation_threshold: U64F64,
+    pub liquidation_threshold: FixedU128,
 
-    pub supply_threshold: U64F64,
+    pub supply_threshold: FixedU128,
 
-    pub liquidation_bonus: U64F64,
+    pub liquidation_bonus: FixedU128,
 
-    pub total_supply_index: U64F64,
+    pub total_supply_index: FixedU128,
 
-    pub total_debt_index: U64F64,
+    pub total_debt_index: FixedU128,
 
     pub last_updated: T::BlockNumber, // TODO: considering timestamp?
 
@@ -86,7 +83,7 @@ pub struct UserSupply<T: Trait> {
 	/// Source of the swap.
 	pub amount: <T as assets::Trait>::Balance,
 	/// Action of this swap.
-    pub index: U64F64,
+    pub index: FixedU128,
     
     pub as_collateral: bool,
 }
@@ -96,7 +93,7 @@ pub struct UserDebt<T: Trait> {
 	/// Source of the swap.
 	pub amount: <T as assets::Trait>::Balance,
 	/// Action of this swap.
-	pub index: U64F64,
+	pub index: FixedU128,
 }
 
 decl_event!(
@@ -402,46 +399,43 @@ impl<T: Trait> Module<T>
 
         // 3 get time span
         let interval_block_number = <frame_system::Module<T>>::block_number() - pool.last_updated;
-		let elapsed_time_u32 = TryInto::try_into(interval_block_number)
+		let elapsed_time_u32 = TryInto::<u32>::try_into(interval_block_number)
 			.ok()
 			.expect("blockchain will not exceed 2^32 blocks; qed");
-        let elapsed_time_U64F64 = U64F64::from_num(elapsed_time_u32);
 
         // 4  get rates and calculate interest
-        let supply_multiplier = U64F64::from_num(1) + Self::get_supply_rate(asset_id) * elapsed_time_U64F64;
-        let debt_multiplier = U64F64::from_num(1) + Self::get_debt_rate(asset_id) * elapsed_time_U64F64;
+        let supply_multiplier = FixedU128::saturating_from_integer(1) + Self::get_supply_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
+        let debt_multiplier = FixedU128::saturating_from_integer(1) + Self::get_debt_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
 
         // 5 update pool index, supply, debt, timestamp
         let supply = TryInto::<u128>::try_into(pool.supply)
             .ok()
             .expect("Balance is u128");
-        let supply = supply * supply_multiplier;
-        let converted = u128::from_fixed(supply);
-        pool.supply = TryInto::<T::Balance>::try_into(converted)
+        let supply = supply_multiplier.saturating_mul_int(supply);
+        pool.supply = TryInto::<T::Balance>::try_into(supply)
             .ok()
             .expect("Balance is u128");
-        pool.total_supply_index *= supply_multiplier;
+        pool.total_supply_index = pool.total_supply_index * supply_multiplier;
 
         let debt = TryInto::<u128>::try_into(pool.debt)
             .ok()
             .expect("Balance is u128");
-        let debt = debt * debt_multiplier;
-        let converted = u128::from_fixed(debt);
-        pool.debt = TryInto::<T::Balance>::try_into(converted)
+        let debt = debt_multiplier.saturating_mul_int(debt);
+        pool.debt = TryInto::<T::Balance>::try_into(debt)
             .ok()
             .expect("Balance is u128");
-        pool.total_debt_index *= debt_multiplier;
+        pool.total_debt_index = pool.total_debt_index * debt_multiplier;
 
         Pools::<T>::insert(asset_id, pool);
 
     }
 
-    fn get_debt_rate(asset_id: T::AssetId) -> U64F64 {
-        let utilization_optimal = U64F64::from_num(1) / 2;
-        let borrow_rate_net1 = U64F64::from_num(7) / 100 / 2000000;
-        let borrow_rate_net2 = U64F64::from_num(14) / 100 / 2000000;
-        let borrow_rate_zero = U64F64::from_num(5) / 100 / 2000000;
-        let borrow_rate_optimal = U64F64::from_num(10) / 100 / 2000000;
+    fn get_debt_rate(asset_id: T::AssetId) -> FixedU128 {
+        let utilization_optimal = FixedU128::saturating_from_rational(1, 2);
+        let borrow_rate_net1 = FixedU128::saturating_from_rational(7, 100*2000000);
+        let borrow_rate_net2 = FixedU128::saturating_from_rational(14, 100*2000000);
+        let borrow_rate_zero = FixedU128::saturating_from_rational(5, 100*2000000);
+        let borrow_rate_optimal = FixedU128::saturating_from_rational(10, 100*2000000);
 
         let pool = Self::pool(asset_id).unwrap();
         let debt = TryInto::<u128>::try_into(pool.debt)
@@ -453,23 +447,23 @@ impl<T: Trait> Module<T>
 
         let utilization_ratio;
         if supply == 0 {
-            utilization_ratio = U64F64::from_num(0);
+            utilization_ratio = FixedU128::zero();
         } else {
-            utilization_ratio = U64F64::from_num(debt) / supply;
+            utilization_ratio = FixedU128::saturating_from_rational(debt, supply);
         }
         if (utilization_ratio <= utilization_optimal) {
             return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
         } else {
-            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) +  borrow_rate_optimal;
+            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::saturating_from_integer(1) - utilization_optimal) +  borrow_rate_optimal;
         }
     }
 
-    fn get_supply_rate(asset_id: T::AssetId) -> U64F64 {
-        let utilization_optimal = U64F64::from_num(1) / 2;
-        let borrow_rate_net1 = U64F64::from_num(7) / 100 / 2000000;
-        let borrow_rate_net2 = U64F64::from_num(14) / 100 / 2000000;
-        let borrow_rate_zero = U64F64::from_num(5) / 100 / 2000000;
-        let borrow_rate_optimal = U64F64::from_num(10) / 100 / 2000000;
+    fn get_supply_rate(asset_id: T::AssetId) -> FixedU128 {
+        let utilization_optimal = FixedU128::saturating_from_rational(1, 2);
+        let borrow_rate_net1 = FixedU128::saturating_from_rational(7, 100*2000000);
+        let borrow_rate_net2 = FixedU128::saturating_from_rational(14, 100*2000000);
+        let borrow_rate_zero = FixedU128::saturating_from_rational(5, 100*2000000);
+        let borrow_rate_optimal = FixedU128::saturating_from_rational(10, 100*2000000);
 
         let pool = Self::pool(asset_id).unwrap();
         let debt = TryInto::<u128>::try_into(pool.debt)
@@ -480,14 +474,14 @@ impl<T: Trait> Module<T>
             .expect("Balance is u128");
         let utilization_ratio;
         if supply == 0 {
-            utilization_ratio = U64F64::from_num(0);
+            utilization_ratio = FixedU128::zero();
         } else {
-            utilization_ratio = U64F64::from_num(debt) / supply;
+            utilization_ratio = FixedU128::saturating_from_rational(debt, supply);
         }
         if (utilization_ratio <= utilization_optimal) {
             return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
         } else {
-            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (U64F64::from_num(1) - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;
+            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::saturating_from_integer(1) - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;
         }
     }
 
@@ -500,9 +494,8 @@ impl<T: Trait> Module<T>
             let original_amount = TryInto::<u128>::try_into(user_supply.amount)
                 .ok()
                 .expect("Balance is u128");
-            let amount_with_interest = U64F64::from_num(original_amount) * pool.total_supply_index / user_supply.index;
-            let converted = u128::from_fixed(amount_with_interest);
-            user_supply.amount = TryInto::<T::Balance>::try_into(converted)
+            let amount_with_interest = (pool.total_supply_index / user_supply.index).saturating_mul_int(original_amount);
+            user_supply.amount = TryInto::<T::Balance>::try_into(amount_with_interest)
                 .ok()
                 .expect("Balance is u128");
 
@@ -534,9 +527,8 @@ impl<T: Trait> Module<T>
             let original_amount = TryInto::<u128>::try_into(user_debt.amount)
                 .ok()
                 .expect("Balance is u128");
-            let amount_with_interest = U64F64::from_num(original_amount) * pool.total_debt_index / user_debt.index;
-            let converted = u128::from_fixed(amount_with_interest);
-            user_debt.amount = TryInto::<T::Balance>::try_into(converted)
+            let amount_with_interest = (pool.total_debt_index / user_debt.index).saturating_mul_int(original_amount);
+            user_debt.amount = TryInto::<T::Balance>::try_into(amount_with_interest)
                 .ok()
                 .expect("Balance is u128");
 
@@ -589,14 +581,14 @@ impl<T: Trait> Module<T>
         let supply_rate = Self::get_supply_rate(asset_id);
         let debt_rate = Self::get_debt_rate(asset_id);
     
-        let supply_apy = supply_rate * U64F64::from_num(BLOCK_PER_YEAR * BASE);
-        let debt_apy = debt_rate * U64F64::from_num(BLOCK_PER_YEAR * BASE);
+        let supply_apy = supply_rate.saturating_mul_int(BLOCK_PER_YEAR * BASE);
+        let debt_apy = debt_rate.saturating_mul_int(BLOCK_PER_YEAR * BASE);
 
-        pool.supply_apy = TryInto::<T::Balance>::try_into(u128::from_fixed(supply_apy))
+        pool.supply_apy = TryInto::<T::Balance>::try_into(supply_apy)
             .ok()
             .expect("Balance is u128");
 
-        pool.debt_apy = TryInto::<T::Balance>::try_into(u128::from_fixed(debt_apy))
+        pool.debt_apy = TryInto::<T::Balance>::try_into(debt_apy)
             .ok()
             .expect("Balance is u128");
 
@@ -611,11 +603,11 @@ impl<T: Trait> Module<T>
             asset: id,
             supply: T::Balance::zero(),
             debt: T::Balance::zero(),
-            liquidation_threshold: U64F64::from_num(12) / 5,
-            supply_threshold: U64F64::from_num(3) / 2,
-            liquidation_bonus: U64F64::from_num(1) / 2,
-            total_supply_index: U64F64::from_num(1),
-            total_debt_index: U64F64::from_num(1),
+            liquidation_threshold: FixedU128::saturating_from_rational(120, 100),
+            supply_threshold: FixedU128::saturating_from_rational(150, 100),
+            liquidation_bonus: FixedU128::saturating_from_rational(105, 100),
+            total_supply_index: FixedU128::saturating_from_integer(1),
+            total_debt_index: FixedU128::saturating_from_integer(1),
             last_updated: <frame_system::Module<T>>::block_number(),
             supply_apy: T::Balance::zero(), // tmp
             debt_apy: T::Balance::zero() // tmp
