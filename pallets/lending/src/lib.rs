@@ -134,7 +134,7 @@ decl_storage! {
     }
 
     add_extra_genesis {
-        config(pools): Vec<(T::AssetId)>;
+        config(pools): Vec<T::AssetId>;
 
         build(|config: &GenesisConfig<T>| {
             for pool in config.pools.iter() {
@@ -214,7 +214,7 @@ decl_module! {
             // pre-check amount
             // TODO: what if user supply is zero?
             let mut amount = amount;
-            if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
+            if let Some(user_supply) = Self::user_supply(asset_id, account.clone()) {
                 if user_supply.amount < amount {
                     amount = user_supply.amount;
                 }
@@ -309,7 +309,7 @@ decl_module! {
 
             // pre-check amount
             let mut amount = amount;
-            if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
+            if let Some(user_debt) = Self::user_debt(asset_id, account.clone()) {
                 if user_debt.amount < amount {
                     amount = user_debt.amount;
                 }
@@ -432,7 +432,7 @@ impl<T: Trait> Module<T> where
         } else {
             utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         }
-        if (utilization_ratio <= utilization_optimal) {
+        if utilization_ratio <= utilization_optimal {
             return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
         } else {
             return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::saturating_from_integer(1) - utilization_optimal) +  borrow_rate_optimal;
@@ -454,7 +454,7 @@ impl<T: Trait> Module<T> where
         } else {
             utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         }
-        if (utilization_ratio <= utilization_optimal) {
+        if utilization_ratio <= utilization_optimal {
             return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
         } else {
             return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::saturating_from_integer(1) - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;

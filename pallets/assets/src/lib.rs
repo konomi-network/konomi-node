@@ -10,7 +10,7 @@ use sp_runtime::{
 };
 use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_std::prelude::*;
-use sp_std::{vec::Vec, convert::TryInto};
+use sp_std::convert::TryInto;
 use sp_runtime::traits::{
     Member, One, AtLeast32BitUnsigned, Zero,
 };
