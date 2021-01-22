@@ -4,7 +4,10 @@ use frame_support::{
     decl_event, decl_module, decl_storage, ensure, Parameter,
     StorageMap, StorageValue,
 };
-use sp_runtime::DispatchResult as Result;
+use sp_runtime::{
+    DispatchResult as Result,
+    FixedPointOperand,
+};
 use frame_system::{self as system, ensure_signed, ensure_root};
 use sp_std::prelude::*;
 use sp_std::{vec::Vec, convert::TryInto};
@@ -18,7 +21,7 @@ pub trait Trait: frame_system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     /// The units in which we record balances.
-    type Balance: Member + Parameter + AtLeast32BitUnsigned + Default + Copy;
+    type Balance: Member + Parameter + FixedPointOperand + AtLeast32BitUnsigned + Default + Copy;
     /// The arithmetic type of asset identifier.
     type AssetId: Parameter + AtLeast32BitUnsigned + Default + Copy;
 }

@@ -2,10 +2,10 @@
 
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
-    StorageMap, StorageValue,
+    StorageMap,
 };
 use sp_runtime::{
-    FixedU128, FixedPointNumber, FixedPointOperand,
+    FixedU128, FixedPointNumber,
     DispatchResult as Result, RuntimeDebug,
     traits::{AccountIdConversion, Zero}, ModuleId
 };
@@ -380,7 +380,7 @@ decl_module! {
     }
 }
 
-impl<T: Trait> Module<T>
+impl<T: Trait> Module<T> where
 {
 
     fn account_id() -> T::AccountId {
@@ -407,23 +407,10 @@ impl<T: Trait> Module<T>
         let supply_multiplier = FixedU128::saturating_from_integer(1) + Self::get_supply_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
         let debt_multiplier = FixedU128::saturating_from_integer(1) + Self::get_debt_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
 
-        // 5 update pool index, supply, debt, timestamp
-        let supply = TryInto::<u128>::try_into(pool.supply)
-            .ok()
-            .expect("Balance is u128");
-        let supply = supply_multiplier.saturating_mul_int(supply);
-        pool.supply = TryInto::<T::Balance>::try_into(supply)
-            .ok()
-            .expect("Balance is u128");
+        pool.supply = supply_multiplier.saturating_mul_int(pool.supply);
         pool.total_supply_index = pool.total_supply_index * supply_multiplier;
 
-        let debt = TryInto::<u128>::try_into(pool.debt)
-            .ok()
-            .expect("Balance is u128");
-        let debt = debt_multiplier.saturating_mul_int(debt);
-        pool.debt = TryInto::<T::Balance>::try_into(debt)
-            .ok()
-            .expect("Balance is u128");
+        pool.debt = debt_multiplier.saturating_mul_int(pool.debt);
         pool.total_debt_index = pool.total_debt_index * debt_multiplier;
 
         Pools::<T>::insert(asset_id, pool);
@@ -438,18 +425,12 @@ impl<T: Trait> Module<T>
         let borrow_rate_optimal = FixedU128::saturating_from_rational(10, 100*2000000);
 
         let pool = Self::pool(asset_id).unwrap();
-        let debt = TryInto::<u128>::try_into(pool.debt)
-            .ok()
-            .expect("Balance is u128");
-        let supply = TryInto::<u128>::try_into(pool.supply)
-            .ok()
-            .expect("Balance is u128");
 
         let utilization_ratio;
-        if supply == 0 {
+        if pool.supply == T::Balance::zero() {
             utilization_ratio = FixedU128::zero();
         } else {
-            utilization_ratio = FixedU128::saturating_from_rational(debt, supply);
+            utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         }
         if (utilization_ratio <= utilization_optimal) {
             return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
@@ -466,17 +447,12 @@ impl<T: Trait> Module<T>
         let borrow_rate_optimal = FixedU128::saturating_from_rational(10, 100*2000000);
 
         let pool = Self::pool(asset_id).unwrap();
-        let debt = TryInto::<u128>::try_into(pool.debt)
-            .ok()
-            .expect("Balance is u128");
-        let supply = TryInto::<u128>::try_into(pool.supply)
-            .ok()
-            .expect("Balance is u128");
+
         let utilization_ratio;
-        if supply == 0 {
+        if pool.supply == T::Balance::zero() {
             utilization_ratio = FixedU128::zero();
         } else {
-            utilization_ratio = FixedU128::saturating_from_rational(debt, supply);
+            utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         }
         if (utilization_ratio <= utilization_optimal) {
             return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
@@ -491,13 +467,8 @@ impl<T: Trait> Module<T>
         let pool = Self::pool(asset_id).unwrap();
 
         if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
-            let original_amount = TryInto::<u128>::try_into(user_supply.amount)
-                .ok()
-                .expect("Balance is u128");
-            let amount_with_interest = (pool.total_supply_index / user_supply.index).saturating_mul_int(original_amount);
-            user_supply.amount = TryInto::<T::Balance>::try_into(amount_with_interest)
-                .ok()
-                .expect("Balance is u128");
+
+            user_supply.amount = (pool.total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount);
 
             user_supply.index = pool.total_supply_index;
 
@@ -524,13 +495,7 @@ impl<T: Trait> Module<T>
         let pool = Self::pool(asset_id).unwrap();
 
         if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
-            let original_amount = TryInto::<u128>::try_into(user_debt.amount)
-                .ok()
-                .expect("Balance is u128");
-            let amount_with_interest = (pool.total_debt_index / user_debt.index).saturating_mul_int(original_amount);
-            user_debt.amount = TryInto::<T::Balance>::try_into(amount_with_interest)
-                .ok()
-                .expect("Balance is u128");
+            user_debt.amount = (pool.total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount);
 
             user_debt.index = pool.total_debt_index;
 
