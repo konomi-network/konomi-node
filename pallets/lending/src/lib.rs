@@ -609,4 +609,17 @@ impl<T: Trait> Module<T> where
 
     }
 
+    /// runtime apis
+    pub fn supply_rate(id: T::AssetId) -> FixedU128 {
+        FixedU128::one()
+    }
+
+    pub fn debt_rate(id: T::AssetId) -> FixedU128 {
+        FixedU128::one()
+    }
+
+    // effective supply balance; borrow balance
+    pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance) {
+        (T::Balance::zero(), T::Balance::zero())
+    }
 }

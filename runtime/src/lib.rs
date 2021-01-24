@@ -9,6 +9,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
+	FixedU128,
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
@@ -464,6 +465,20 @@ impl_runtime_apis! {
         fn calculate_output(in_id: AssetId, out_id: AssetId, amount_in: Balance) -> Balance {
             Swap::calculate_output(in_id, out_id, amount_in)
         }
+	}
+	
+	impl pallet_lending_rpc_runtime_api::LendingApi<Block, AssetId, FixedU128, AccountId, Balance> for Runtime {
+        fn supply_rate(id: AssetId) -> FixedU128 {
+            Lending::supply_rate(id)
+		}
+
+		fn debt_rate(id: AssetId) -> FixedU128 {
+            Lending::debt_rate(id)
+		}
+		
+		fn get_user_info(user: AccountId) -> (Balance, Balance) {
+			Lending::get_user_info(user)
+		}
     }
 
 	#[cfg(feature = "runtime-benchmarks")]

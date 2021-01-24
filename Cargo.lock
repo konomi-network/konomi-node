@@ -2585,6 +2585,7 @@ dependencies = [
  "frame-benchmarking-cli",
  "jsonrpc-core",
  "konomi-runtime",
+ "pallet-lending-rpc",
  "pallet-swap-rpc",
  "pallet-transaction-payment-rpc",
  "sc-basic-authorship",
@@ -2629,6 +2630,7 @@ dependencies = [
  "pallet-balances",
  "pallet-grandpa",
  "pallet-lending",
+ "pallet-lending-rpc-runtime-api",
  "pallet-randomness-collective-flip",
  "pallet-sudo",
  "pallet-swap",
@@ -3855,6 +3857,31 @@ dependencies = [
  "sp-runtime",
  "sp-std",
  "traits",
+]
+
+[[package]]
+name = "pallet-lending-rpc"
+version = "0.8.1"
+dependencies = [
+ "jsonrpc-core",
+ "jsonrpc-core-client",
+ "jsonrpc-derive",
+ "pallet-lending-rpc-runtime-api",
+ "parity-scale-codec",
+ "serde",
+ "serde_json",
+ "sp-api",
+ "sp-blockchain",
+ "sp-rpc",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pallet-lending-rpc-runtime-api"
+version = "0.8.1"
+dependencies = [
+ "parity-scale-codec",
+ "sp-api",
 ]
 
 [[package]]

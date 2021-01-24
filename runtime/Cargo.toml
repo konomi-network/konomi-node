@@ -29,6 +29,7 @@ pallet-assets = { path = '../pallets/assets', default-features = false, version 
 pallet-swap = { path = '../pallets/swap', default-features = false, version = '2.0.1' }
 pallet-lending = { path = '../pallets/lending', default-features = false, version = '2.0.1' }
 pallet-swap-rpc-runtime-api = { version = "0.8.1", default-features = false, path = "../pallets/swap/rpc/runtime-api/" }
+pallet-lending-rpc-runtime-api = { version = "0.8.1", default-features = false, path = "../pallets/lending/rpc/runtime-api/" }
 
 # Substrate dependencies
 frame-benchmarking = { default-features = false, optional = true, version = '2.0.1' }
