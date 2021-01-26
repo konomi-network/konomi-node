@@ -7,7 +7,7 @@ use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_runtime::{
 	generic::BlockId,
-	traits::{Block as BlockT, Header as HeaderT},
+	traits::Block as BlockT,
 };
 
 pub use pallet_lending_rpc_runtime_api::LendingApi as LendingRuntimeApi;

@@ -2652,7 +2652,6 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
- "traits",
 ]
 
 [[package]]
@@ -7696,6 +7695,9 @@ dependencies = [
 [[package]]
 name = "traits"
 version = "2.0.1"
+dependencies = [
+ "sp-std",
+]
 
 [[package]]
 name = "trie-db"

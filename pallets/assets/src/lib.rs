@@ -14,7 +14,7 @@ use sp_std::convert::TryInto;
 use sp_runtime::traits::{
     Member, One, AtLeast32BitUnsigned, Zero,
 };
-use traits::Oracle;
+use traits::{Oracle, MultiAsset};
 
 /// The module configuration trait.
 pub trait Trait: frame_system::Trait {
@@ -270,5 +270,11 @@ impl<T: Trait> Module<T> {
 impl<T: Trait> Oracle<T::AssetId, T::Balance> for Module<T> {
     fn get_rate(asset_id: T::AssetId) -> T::Balance {
         Self::price(asset_id)
+    }
+}
+
+impl<T: Trait> MultiAsset<T::AccountId, T::AssetId, T::Balance> for Module<T> {
+	fn transfer(from: T::AccountId, id: T::AssetId, to: T::AccountId, amount: T::Balance) -> sp_std::result::Result<(), &'static str> {
+        Self::transfer(from, id, to, amount)
     }
 }

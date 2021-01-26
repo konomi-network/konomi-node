@@ -2,22 +2,22 @@
 
 use frame_support::{
     decl_event, decl_module, decl_storage, decl_error,
-    StorageMap,
+    StorageMap, Parameter,
 };
 use sp_runtime::{
-    FixedU128, FixedPointNumber,
-    DispatchResult as Result, RuntimeDebug,
-    traits::{AccountIdConversion, Zero}, ModuleId
+    FixedU128, FixedPointNumber, FixedPointOperand,
+    DispatchResult as Result, RuntimeDebug, ModuleId,
+    traits::{
+        Member, AtLeast32BitUnsigned, AccountIdConversion, Zero
+    }, 
 };
 use frame_system::{self as system, ensure_signed};
 use sp_std::prelude::*;
 use sp_std::{vec::Vec, convert::TryInto};
-use pallet_assets as assets;
 use codec::{Encode, Decode};
-use traits::Oracle;
+use traits::{Oracle, MultiAsset};
 
 // TODO: fee, reserves
-// TODO: loose couple
 // TODO: child storage
 // TODO: add events
 // TODO: U64F64 as type
@@ -26,11 +26,17 @@ use traits::Oracle;
 const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 
 /// The module's configuration trait.
-pub trait Trait: assets::Trait {
-    /// The overarching event type.
+pub trait Trait: frame_system::Trait {
+    /// The units in which we record balances.
+    type Balance: Member + Parameter + FixedPointOperand + AtLeast32BitUnsigned + Default + Copy;
+    /// The arithmetic type of asset identifier.
+    type AssetId: Parameter + AtLeast32BitUnsigned + Default + Copy;
+
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
     type Oracle: Oracle<Self::AssetId, Self::Balance>;
+
+    type MultiAsset: MultiAsset<Self::AccountId, Self::AssetId, Self::Balance>;
 }
 
 
@@ -64,7 +70,7 @@ pub struct Pool<T: Trait> {
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserSupply<T: Trait> {
 	/// Source of the swap.
-	pub amount: <T as assets::Trait>::Balance,
+	pub amount: T::Balance,
 	/// Action of this swap.
     pub index: FixedU128,
     
@@ -74,16 +80,16 @@ pub struct UserSupply<T: Trait> {
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserDebt<T: Trait> {
 	/// Source of the swap.
-	pub amount: <T as assets::Trait>::Balance,
+	pub amount: T::Balance,
 	/// Action of this swap.
 	pub index: FixedU128,
 }
 
 decl_event!(
-    pub enum Event<T>
-    where <T as system::Trait>::AccountId,
-    <T as assets::Trait>::Balance,
-    <T as assets::Trait>::AssetId {
+    pub enum Event<T> where 
+    <T as system::Trait>::AccountId,
+    <T as Trait>::Balance,
+    <T as Trait>::AssetId {
 
         Supplied(AssetId, AccountId, Balance),
 
@@ -155,7 +161,7 @@ decl_module! {
             // 1 accrue interest
             Self::accrue_interest(asset_id);
             // 2 transfer asset
-            <assets::Module<T>>::transfer(
+            T::MultiAsset::transfer(
                 account.clone(), // TODO: use reference
                 asset_id,
                 Self::account_id(),
@@ -206,7 +212,7 @@ decl_module! {
             }
 
             // 4 transfer asset to user
-            <assets::Module<T>>::transfer(
+            T::MultiAsset::transfer(
                 Self::account_id(),
                 asset_id,
                 account.clone(),
@@ -243,7 +249,7 @@ decl_module! {
             }
 
             // 4 transfer asset to user
-            <assets::Module<T>>::transfer(
+            T::MultiAsset::transfer(
                 Self::account_id(),
                 asset_id,
                 account.clone(),
@@ -275,7 +281,7 @@ decl_module! {
             // 1 accrue interest
             Self::accrue_interest(asset_id);
             // 2 transfer token from user
-            <assets::Module<T>>::transfer(
+            T::MultiAsset::transfer(
                 account.clone(), // TODO: use reference
                 asset_id,
                 Self::account_id(),
