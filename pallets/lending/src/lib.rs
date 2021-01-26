@@ -58,10 +58,6 @@ pub struct Pool<T: Trait> {
     pub total_debt_index: FixedU128,
 
     pub last_updated: T::BlockNumber, // TODO: considering timestamp?
-
-    pub supply_apy: T::Balance, // tmp
-
-    pub debt_apy: T::Balance // tmp
     
 }
 
@@ -194,7 +190,6 @@ decl_module! {
                 UserSupplySet::<T>::insert(account.clone(), assets);
             }
 
-            Self::update_apys(asset_id);
             Self::_update_user(account);
             Ok(())
         }
@@ -242,7 +237,6 @@ decl_module! {
 
             Self::deposit_event(RawEvent::Withdrawn(asset_id, account.clone(), amount));
 
-            Self::update_apys(asset_id);
             Self::_update_user(account);
             Ok(())
         }
@@ -284,7 +278,6 @@ decl_module! {
                 assets.push(asset_id);
                 UserDebtSet::<T>::insert(account.clone(), assets);
             }
-            Self::update_apys(asset_id);
             Self::_update_user(account);
             Ok(())
         }
@@ -322,7 +315,6 @@ decl_module! {
 
             Self::deposit_event(RawEvent::Repaid(asset_id, account.clone(), amount));
 
-            Self::update_apys(asset_id);
             Self::_update_user(account);
             Ok(())
         }
@@ -492,30 +484,6 @@ impl<T: Trait> Module<T> where
         Pools::<T>::insert(asset_id, pool);
     }
 
-    // tmp
-    fn update_apys(asset_id: T::AssetId) {
-
-        const BASE: u64 = 1000000;
-        const BLOCK_PER_YEAR: u64 = 10*60*24*365;
-
-        let mut pool = Self::pool(asset_id).unwrap();
-        let supply_rate = Self::supply_rate(asset_id);
-        let debt_rate = Self::debt_rate(asset_id);
-    
-        let supply_apy = supply_rate.saturating_mul_int(BLOCK_PER_YEAR * BASE);
-        let debt_apy = debt_rate.saturating_mul_int(BLOCK_PER_YEAR * BASE);
-
-        pool.supply_apy = TryInto::<T::Balance>::try_into(supply_apy)
-            .ok()
-            .expect("Balance is u128");
-
-        pool.debt_apy = TryInto::<T::Balance>::try_into(debt_apy)
-            .ok()
-            .expect("Balance is u128");
-
-        Pools::<T>::insert(asset_id, pool);
-    }
-
     fn _init_pool(id: T::AssetId, can_be_collateral: bool) {
 
         let pool = Pool::<T> {
@@ -530,8 +498,6 @@ impl<T: Trait> Module<T> where
             total_supply_index: FixedU128::saturating_from_integer(1),
             total_debt_index: FixedU128::saturating_from_integer(1),
             last_updated: <frame_system::Module<T>>::block_number(),
-            supply_apy: T::Balance::zero(), // tmp
-            debt_apy: T::Balance::zero() // tmp
         };
 
         Pools::<T>::insert(id, pool);
