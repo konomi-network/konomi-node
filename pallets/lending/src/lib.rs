@@ -114,12 +114,12 @@ decl_storage! {
     trait Store for Module<T: Trait> as Lending
     {
         pub UserDebts get(fn user_debt): double_map
-        hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
-        => Option<UserDebt<T>>;
+            hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
+            => Option<UserDebt<T>>;
 
         pub UserSupplies get(fn user_supply): double_map
-        hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
-        => Option<UserSupply<T>>;
+            hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
+            => Option<UserSupply<T>>;
 
         pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
 
