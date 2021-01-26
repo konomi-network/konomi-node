@@ -61,19 +61,6 @@ pub struct Pool<T: Trait> {
     
 }
 
-// tmp
-#[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
-pub struct User<T: Trait> {
-	/// Source of the swap.
-	pub borrow_limit: T::Balance,
-	/// Action of this swap.
-
-    pub supply_balance: T::Balance,
-
-    pub debt_balance: T::Balance,
-
-}
-
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserSupply<T: Trait> {
 	/// Source of the swap.
@@ -122,8 +109,6 @@ decl_storage! {
             => Option<UserSupply<T>>;
 
         pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
-
-        pub Users get(fn user): map hasher(blake2_128_concat) T::AccountId => Option<User<T>>;
 
         pub UserSupplySet get(fn user_supply_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
         pub UserDebtSet get(fn user_debt_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
