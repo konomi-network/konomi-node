@@ -57,7 +57,7 @@ pub struct Pool<T: Trait> {
 
     pub total_debt_index: FixedU128,
 
-    pub last_updated: T::BlockNumber, // TODO: considering timestamp?
+    pub last_updated: T::BlockNumber,
     
 }
 
