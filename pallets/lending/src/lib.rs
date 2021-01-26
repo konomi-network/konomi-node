@@ -187,10 +187,9 @@ decl_module! {
             let mut assets = Self::user_supply_set(account.clone());
             if !assets.iter().any(|x| *x == asset_id) {
                 assets.push(asset_id);
-                UserSupplySet::<T>::insert(account.clone(), assets);
+                UserSupplySet::<T>::insert(account, assets);
             }
 
-            Self::_update_user(account);
             Ok(())
         }
 
@@ -235,9 +234,8 @@ decl_module! {
             // 6 update pool supply
             Self::update_pool_supply(asset_id, amount, false);
 
-            Self::deposit_event(RawEvent::Withdrawn(asset_id, account.clone(), amount));
+            Self::deposit_event(RawEvent::Withdrawn(asset_id, account, amount));
 
-            Self::_update_user(account);
             Ok(())
         }
 
@@ -276,9 +274,8 @@ decl_module! {
             let mut assets = Self::user_debt_set(account.clone());
             if !assets.iter().any(|x| *x == asset_id) {
                 assets.push(asset_id);
-                UserDebtSet::<T>::insert(account.clone(), assets);
+                UserDebtSet::<T>::insert(account, assets);
             }
-            Self::_update_user(account);
             Ok(())
         }
 
@@ -313,9 +310,8 @@ decl_module! {
             // 4 update pool borrow
             Self::update_pool_debt(asset_id, amount, false);
 
-            Self::deposit_event(RawEvent::Repaid(asset_id, account.clone(), amount));
+            Self::deposit_event(RawEvent::Repaid(asset_id, account, amount));
 
-            Self::_update_user(account);
             Ok(())
         }
 
@@ -503,34 +499,6 @@ impl<T: Trait> Module<T> where
         Pools::<T>::insert(id, pool);
     }
 
-    fn _update_user(account: T::AccountId) {
-
-        let mut supply_balance = T::Balance::zero();
-        let mut borrow_limit = T::Balance::zero();
-        for asset in Self::user_supply_set(account.clone()).into_iter() {
-            let amount = Self::user_supply(asset, account.clone()).unwrap().amount;
-            let price = T::Oracle::get_rate(asset);
-            supply_balance += amount * price / T::Balance::from(1000000);
-            borrow_limit += amount * price / T::Balance::from(1000000) * T::Balance::from(10) / T::Balance::from(15);
-        }
-
-        let mut debt_balance = T::Balance::zero();
-        for asset in Self::user_debt_set(account.clone()).into_iter() {
-            let amount = Self::user_debt(asset, account.clone()).unwrap().amount;
-            let price = T::Oracle::get_rate(asset);
-            debt_balance += amount * price / T::Balance::from(1000000);
-        }
-
-        let user = User::<T> {
-            borrow_limit,
-            supply_balance,
-            debt_balance,
-        };
-
-        Users::<T>::insert(account, user);
-
-    }
-
     /// runtime apis
     pub fn supply_rate(id: T::AssetId) -> FixedU128 {
         let utilization_optimal = FixedU128::saturating_from_rational(1, 2);
@@ -576,8 +544,25 @@ impl<T: Trait> Module<T> where
         }
     }
 
-    // effective supply balance; borrow balance
+    // effective borrow limit; debt balance
     pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance) {
-        (T::Balance::zero(), T::Balance::zero())
+        let mut supply_balance = T::Balance::zero();
+        let mut borrow_limit = T::Balance::zero();
+        for asset in Self::user_supply_set(user.clone()).into_iter() {
+            let amount = Self::user_supply(asset, user.clone()).unwrap().amount;
+            let price = T::Oracle::get_rate(asset);
+            supply_balance += amount * price / T::Balance::from(1000000);
+            borrow_limit += amount * price / T::Balance::from(1000000) * T::Balance::from(10) / T::Balance::from(15);
+        }
+
+        let mut debt_balance = T::Balance::zero();
+        for asset in Self::user_debt_set(user.clone()).into_iter() {
+            let amount = Self::user_debt(asset, user.clone()).unwrap().amount;
+            let price = T::Oracle::get_rate(asset);
+            debt_balance += amount * price / T::Balance::from(1000000);
+        }
+
+
+        (borrow_limit, debt_balance)
     }
 }
