@@ -19,8 +19,6 @@ use traits::{Oracle, MultiAsset};
 
 // TODO: fee, reserves
 // TODO: child storage
-// TODO: add events
-// TODO: U64F64 as type
 // TODO: reduce pool storage read
 
 const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
@@ -118,6 +116,7 @@ decl_storage! {
 
         pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
 
+        // TODO: use bit set
         pub UserSupplySet get(fn user_supply_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
         pub UserDebtSet get(fn user_debt_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
     }
