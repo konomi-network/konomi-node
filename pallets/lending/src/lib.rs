@@ -99,6 +99,8 @@ decl_event!(
 
         Repaid(AssetId, AccountId, Balance),
 
+        Liquidated(AssetId, AssetId, AccountId, AccountId, Balance, Balance),
+
     }
 );
 
