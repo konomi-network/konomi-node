@@ -19,7 +19,6 @@ use traits::{Oracle, MultiAsset};
 
 // TODO: fee, reserves
 // TODO: child storage
-// TODO: reduce pool storage read
 
 const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 
@@ -138,6 +137,7 @@ decl_error! {
         TransferFailed,
         NotEnoughLiquidity,
         InsufficientCollateral,
+        PoolNotExist,
 	}
 }
 
@@ -158,9 +158,10 @@ decl_module! {
             amount: T::Balance) -> Result {
             let account = ensure_signed(origin)?;
 
-            // TODO check pool exists
+            // check pool exists and get pool instance
+            let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // 1 accrue interest
-            Self::accrue_interest(asset_id);
+            Self::accrue_interest(asset_id, &mut pool);
             // 2 transfer asset
             T::MultiAsset::transfer(
                 account.clone(), // TODO: use reference
@@ -170,9 +171,9 @@ decl_module! {
             ).map_err(|_| Error::<T>::TransferFailed)?;
 
             // 3 update user supply
-            Self::update_user_supply(asset_id, account.clone(), amount, true);
+            Self::update_user_supply(&pool, asset_id, account.clone(), amount, true);
             // 4 update pool supply
-            Self::update_pool_supply(asset_id, amount, true);
+            Self::update_pool_supply(&mut pool, amount, true);
 
             Self::deposit_event(RawEvent::Supplied(asset_id, account.clone(), amount));
 
@@ -181,6 +182,9 @@ decl_module! {
                 assets.push(asset_id);
                 UserSupplySet::<T>::insert(account, assets);
             }
+
+            // update pool
+            Pools::<T>::insert(asset_id, pool);
 
             Ok(())
         }
@@ -192,9 +196,10 @@ decl_module! {
             amount: T::Balance) -> Result {
             let account = ensure_signed(origin)?;
 
-            // TODO check pool exists
+            // check pool exists and get pool instance
+            let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // 1 accrue interest
-            Self::accrue_interest(asset_id);
+            Self::accrue_interest(asset_id, &mut pool);
             // 2 check collateral TODO need to first update user's supply to check the latest ratio...
             
             // pre-check amount
@@ -207,7 +212,6 @@ decl_module! {
             }
 
             // 3 check pool cash = (deposit - borrow) > amount
-            let pool = Self::pool(asset_id).unwrap();
             if (pool.supply - pool.debt) < amount {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
@@ -221,12 +225,15 @@ decl_module! {
             ).map_err(|_| Error::<T>::TransferFailed)?;
 
             // 5 update user supply
-            Self::update_user_supply(asset_id, account.clone(), amount, false);
+            Self::update_user_supply(&pool, asset_id, account.clone(), amount, false);
 
             // 6 update pool supply
-            Self::update_pool_supply(asset_id, amount, false);
+            Self::update_pool_supply(&mut pool, amount, false);
 
             Self::deposit_event(RawEvent::Withdrawn(asset_id, account, amount));
+
+            // update pool
+            Pools::<T>::insert(asset_id, pool);
 
             Ok(())
         }
@@ -238,13 +245,14 @@ decl_module! {
             amount: T::Balance) -> Result {
             let account = ensure_signed(origin)?;
 
-            // TODO check pool exists
+            // check pool exists and get pool instance
+            let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
+
             // 1 accrue interest
-            Self::accrue_interest(asset_id);
+            Self::accrue_interest(asset_id, &mut pool);
             // 2 check collateral
 
             // 3 check pool cash = (deposit - borrow) > amount
-            let pool = Self::pool(asset_id).unwrap();
             if (pool.supply - pool.debt) < amount {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
@@ -257,9 +265,9 @@ decl_module! {
                 amount,
             ).map_err(|_| Error::<T>::TransferFailed)?;
             // 5 update user Borrow
-            Self::update_user_debt(asset_id, account.clone(), amount, true);
+            Self::update_user_debt(&pool, asset_id, account.clone(), amount, true);
             // 6 update pool borrow
-            Self::update_pool_debt(asset_id, amount, true);
+            Self::update_pool_debt(&mut pool, amount, true);
 
             Self::deposit_event(RawEvent::Borrowed(asset_id, account.clone(), amount));
 
@@ -268,6 +276,10 @@ decl_module! {
                 assets.push(asset_id);
                 UserDebtSet::<T>::insert(account, assets);
             }
+
+            // update pool
+            Pools::<T>::insert(asset_id, pool);
+
             Ok(())
         }
 
@@ -278,9 +290,10 @@ decl_module! {
             amount: T::Balance) -> Result {
             let account = ensure_signed(origin)?;
 
-            // TODO check pool exists
+            // check pool exists and get pool instance
+            let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // 1 accrue interest
-            Self::accrue_interest(asset_id);
+            Self::accrue_interest(asset_id, &mut pool);
             // 2 transfer token from user
             T::MultiAsset::transfer(
                 account.clone(), // TODO: use reference
@@ -298,11 +311,14 @@ decl_module! {
             }
 
             // 3 update user Borrow
-            Self::update_user_debt(asset_id, account.clone(), amount, false);
+            Self::update_user_debt(&pool, asset_id, account.clone(), amount, false);
             // 4 update pool borrow
-            Self::update_pool_debt(asset_id, amount, false);
+            Self::update_pool_debt(&mut pool, amount, false);
 
             Self::deposit_event(RawEvent::Repaid(asset_id, account, amount));
+
+            // update pool
+            Pools::<T>::insert(asset_id, pool);
 
             Ok(())
         }
@@ -320,29 +336,29 @@ decl_module! {
 
         // arbitrager related
 
-        #[weight = 1]
-        fn liquidate(
-            origin,
-            target_user: T::AccountId,
-            pay_asset_id: T::AssetId,
-            get_asset_id: T::AssetId,
-            pay_asset_amount: T::Balance
-        ) -> Result {
-            let account = ensure_signed(origin)?;
+        // #[weight = 1]
+        // fn liquidate(
+        //     origin,
+        //     target_user: T::AccountId,
+        //     pay_asset_id: T::AssetId,
+        //     get_asset_id: T::AssetId,
+        //     pay_asset_amount: T::Balance
+        // ) -> Result {
+        //     let account = ensure_signed(origin)?;
 
-            // TODO check pool exists
-            // 1 check if get_asset_id is enabled as collatoral
-            // 2 accrue interest of pay and get asset
-            Self::accrue_interest(pay_asset_id);
-            Self::accrue_interest(get_asset_id);
-            // 3 check if target user is under liquidation condition
-            // 4 check if liquidation % is more than threshold 
-            // 5 transfer token from arbitrager
-            // 6 transfer collateral to arbitrager
-            // 7 recalculate target user's borrow and supply in 2 pools
+        //     // TODO check pool exists
+        //     // 1 check if get_asset_id is enabled as collatoral
+        //     // 2 accrue interest of pay and get asset
+        //     Self::accrue_interest(pay_asset_id);
+        //     Self::accrue_interest(get_asset_id);
+        //     // 3 check if target user is under liquidation condition
+        //     // 4 check if liquidation % is more than threshold 
+        //     // 5 transfer token from arbitrager
+        //     // 6 transfer collateral to arbitrager
+        //     // 7 recalculate target user's borrow and supply in 2 pools
 
-            Ok(())
-        }
+        //     Ok(())
+        // }
         
         // governance related
 
@@ -367,12 +383,9 @@ impl<T: Trait> Module<T> where
 		PALLET_ID.into_account()
     }
     
-    fn accrue_interest(asset_id: T::AssetId) {
-        // TODO avoid multi get pool
+    fn accrue_interest(asset_id: T::AssetId, pool: &mut Pool<T>) {
         // TODO use error of convert error
         // TODO use compound interest
-        // 1 get pool
-        let mut pool = Self::pool(asset_id).unwrap();
         if pool.last_updated == <frame_system::Module<T>>::block_number() {
             return
         }
@@ -393,15 +406,11 @@ impl<T: Trait> Module<T> where
         pool.debt = debt_multiplier.saturating_mul_int(pool.debt);
         pool.total_debt_index = pool.total_debt_index * debt_multiplier;
 
-        Pools::<T>::insert(asset_id, pool);
-
     }
 
     // TODO: if final amount = 0, clean up
     // TODO: return the actual - value if clean up
-    fn update_user_supply(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
-        let pool = Self::pool(asset_id).unwrap();
-
+    fn update_user_supply(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
         if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
 
             user_supply.amount = (pool.total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount);
@@ -427,8 +436,7 @@ impl<T: Trait> Module<T> where
 
     // TODO: if final amount = 0, clean up
     // TODO: return the actual - value if clean up
-    fn update_user_debt(asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
-        let pool = Self::pool(asset_id).unwrap();
+    fn update_user_debt(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
 
         if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
             user_debt.amount = (pool.total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount);
@@ -450,26 +458,20 @@ impl<T: Trait> Module<T> where
         }
     }
 
-    fn update_pool_supply(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
-        // TODO: error handle
-        let mut pool = Self::pool(asset_id).unwrap();
+    fn update_pool_supply(pool: &mut Pool<T>, amount: T::Balance, positive: bool) {
         if positive {
             pool.supply += amount;
         } else {
             pool.supply -= amount;
         }
-        Pools::<T>::insert(asset_id, pool);
     }
 
-    fn update_pool_debt(asset_id: T::AssetId, amount: T::Balance, positive: bool) {
-        // TODO: error handle
-        let mut pool = Self::pool(asset_id).unwrap();
+    fn update_pool_debt(pool: &mut Pool<T>, amount: T::Balance, positive: bool) {
         if positive {
             pool.debt += amount;
         } else {
             pool.debt -= amount;
         }
-        Pools::<T>::insert(asset_id, pool);
     }
 
     fn _init_pool(id: T::AssetId, can_be_collateral: bool) {
