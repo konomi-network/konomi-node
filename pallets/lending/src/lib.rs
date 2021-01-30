@@ -51,9 +51,9 @@ pub struct Pool<T: Trait> {
 
     pub debt: T::Balance,
 
-    pub liquidation_threshold: FixedU128,
+    pub liquidation_factor: FixedU128,
 
-    pub supply_threshold: FixedU128,
+    pub safe_factor: FixedU128,
 
     pub liquidation_bonus: FixedU128,
 
@@ -480,8 +480,8 @@ impl<T: Trait> Module<T> where
             asset: id,
             supply: T::Balance::zero(),
             debt: T::Balance::zero(),
-            liquidation_threshold: FixedU128::saturating_from_rational(120, 100),
-            supply_threshold: FixedU128::saturating_from_rational(150, 100),
+            liquidation_factor: FixedU128::saturating_from_rational(120, 100),
+            safe_factor: FixedU128::saturating_from_rational(150, 100),
             liquidation_bonus: FixedU128::saturating_from_rational(105, 100),
             total_supply_index: FixedU128::saturating_from_integer(1),
             total_debt_index: FixedU128::saturating_from_integer(1),
