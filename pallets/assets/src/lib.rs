@@ -5,6 +5,7 @@ use frame_support::{
     StorageMap, StorageValue,
 };
 use sp_runtime::{
+    FixedU128, FixedPointNumber,
     DispatchResult as Result,
     FixedPointOperand,
 };
@@ -106,7 +107,7 @@ decl_module! {
         }
 
         #[weight = 1]
-        pub fn set_price(origin, id: T::AssetId, price: T::Balance) -> Result {
+        pub fn set_price(origin, id: T::AssetId, price: FixedU128) -> Result {
             ensure_root(origin)?;
             Self::_set_price(id, price);
             Ok(())
@@ -141,13 +142,13 @@ decl_storage! {
         /// The default inherent asset in this platform
         InherentAsset get(fn inherent_asset_id): T::AssetId;
         /// Price of the asset (base is 1000000)
-        Price get(fn price): map hasher(twox_64_concat) T::AssetId => T::Balance;
+        Price get(fn price): map hasher(twox_64_concat) T::AssetId => FixedU128;
         /// for test only
         Owner get(fn owner) config(): T::AccountId;
     }
     
     add_extra_genesis {
-        config(assets): Vec<(T::AccountId, T::Balance, T::Balance)>;
+        config(assets): Vec<(T::AccountId, T::Balance, u64)>;
 
         build(|config: &GenesisConfig<T>| {
             for asset in config.assets.iter() {
@@ -156,7 +157,7 @@ decl_storage! {
                 let to_account = <Owner<T>>::get();
                 let asset_id = <NextAssetId<T>>::get() - 1.into();
                 <Module<T>>::transfer(account.clone(), asset_id, to_account, 50000.into());
-                <Module<T>>::_set_price(asset_id, *price);
+                <Module<T>>::_set_price(asset_id, FixedU128::saturating_from_integer(*price));
             }
         })
     }
@@ -192,7 +193,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn _set_price(id: T::AssetId, price: T::Balance) {
+    fn _set_price(id: T::AssetId, price: FixedU128) {
         <Price<T>>::insert(id, price);
     }
 
@@ -267,8 +268,8 @@ impl<T: Trait> Module<T> {
 
 }
 
-impl<T: Trait> Oracle<T::AssetId, T::Balance> for Module<T> {
-    fn get_rate(asset_id: T::AssetId) -> T::Balance {
+impl<T: Trait> Oracle<T::AssetId, FixedU128> for Module<T> {
+    fn get_rate(asset_id: T::AssetId) -> FixedU128 {
         Self::price(asset_id)
     }
 }

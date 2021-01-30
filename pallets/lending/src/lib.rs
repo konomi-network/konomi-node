@@ -32,7 +32,7 @@ pub trait Trait: frame_system::Trait {
 
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
-    type Oracle: Oracle<Self::AssetId, Self::Balance>;
+    type Oracle: Oracle<Self::AssetId, FixedU128>;
 
     type MultiAsset: MultiAsset<Self::AccountId, Self::AssetId, Self::Balance>;
 }
@@ -543,15 +543,15 @@ impl<T: Trait> Module<T> where
         for asset in Self::user_supply_set(user.clone()).into_iter() {
             let amount = Self::user_supply(asset, user.clone()).unwrap().amount;
             let price = T::Oracle::get_rate(asset);
-            supply_balance += amount * price / T::Balance::from(1000000);
-            borrow_limit += amount * price / T::Balance::from(1000000) * T::Balance::from(10) / T::Balance::from(15);
+            supply_balance += price.saturating_mul_int(amount);
+            borrow_limit += price.saturating_mul_int(amount) * T::Balance::from(10) / T::Balance::from(15);
         }
 
         let mut debt_balance = T::Balance::zero();
         for asset in Self::user_debt_set(user.clone()).into_iter() {
             let amount = Self::user_debt(asset, user.clone()).unwrap().amount;
             let price = T::Oracle::get_rate(asset);
-            debt_balance += amount * price / T::Balance::from(1000000);
+            debt_balance += price.saturating_mul_int(amount);
         }
 
 
