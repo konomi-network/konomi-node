@@ -61,6 +61,12 @@ pub struct Pool<T: Trait> {
     pub total_debt_index: FixedU128,
 
     pub last_updated: T::BlockNumber,
+
+    pub utilization_factor: FixedU128,
+
+    pub initial_interest_rate_supply: FixedU128,
+
+    pub initial_interest_rate_debt: FixedU128,
     
 }
 
@@ -412,8 +418,8 @@ impl<T: Trait> Module<T> where
 			.expect("blockchain will not exceed 2^32 blocks; qed");
 
         // get rates and calculate interest
-        let supply_multiplier = FixedU128::one() + Self::supply_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
-        let debt_multiplier = FixedU128::one() + Self::debt_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
+        let supply_multiplier = FixedU128::one() + Self::supply_rate_internal(pool) * FixedU128::saturating_from_integer(elapsed_time_u32);
+        let debt_multiplier = FixedU128::one() + Self::debt_rate_internal(pool) * FixedU128::saturating_from_integer(elapsed_time_u32);
 
         pool.supply = supply_multiplier.saturating_mul_int(pool.supply);
         pool.total_supply_index = pool.total_supply_index * supply_multiplier;
@@ -503,54 +509,57 @@ impl<T: Trait> Module<T> where
             total_supply_index: FixedU128::one(),
             total_debt_index: FixedU128::one(),
             last_updated: <frame_system::Module<T>>::block_number(),
+            utilization_factor: FixedU128::one(), // tmps
+            initial_interest_rate_supply: FixedU128::one(),
+            initial_interest_rate_debt: FixedU128::one(),
         };
 
         Pools::<T>::insert(id, pool);
     }
 
-    /// runtime apis
-    pub fn supply_rate(id: T::AssetId) -> FixedU128 {
-        let utilization_optimal = FixedU128::saturating_from_rational(1, 2);
-        let borrow_rate_net1 = FixedU128::saturating_from_rational(7, 100*2000000);
-        let borrow_rate_net2 = FixedU128::saturating_from_rational(14, 100*2000000);
-        let borrow_rate_zero = FixedU128::saturating_from_rational(5, 100*2000000);
-        let borrow_rate_optimal = FixedU128::saturating_from_rational(10, 100*2000000);
-
-        let pool = Self::pool(id).unwrap();
-
+    fn supply_rate_internal(pool: &Pool<T>) -> FixedU128 {
         let utilization_ratio;
         if pool.supply == T::Balance::zero() {
             utilization_ratio = FixedU128::zero();
         } else {
             utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         }
-        if utilization_ratio <= utilization_optimal {
-            return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
+
+        pool.initial_interest_rate_supply + pool.utilization_factor * utilization_ratio
+    }
+
+    fn debt_rate_internal(pool: &Pool<T>) -> FixedU128 {
+        let utilization_ratio;
+        if pool.supply == T::Balance::zero() {
+            utilization_ratio = FixedU128::zero();
         } else {
-            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::one() - utilization_optimal) +  borrow_rate_optimal;
+            utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         }
+
+        pool.initial_interest_rate_debt + pool.utilization_factor * utilization_ratio
+    }
+
+    /// runtime apis
+    pub fn supply_rate(id: T::AssetId) -> FixedU128 {
+        let pool = Self::pool(id);
+        if pool.is_none() {
+            return FixedU128::zero()
+        }
+
+        let pool = pool.unwrap();
+
+        Self::supply_rate_internal(&pool)
     }
 
     pub fn debt_rate(id: T::AssetId) -> FixedU128 {
-        let utilization_optimal = FixedU128::saturating_from_rational(1, 2);
-        let borrow_rate_net1 = FixedU128::saturating_from_rational(7, 100*2000000);
-        let borrow_rate_net2 = FixedU128::saturating_from_rational(14, 100*2000000);
-        let borrow_rate_zero = FixedU128::saturating_from_rational(5, 100*2000000);
-        let borrow_rate_optimal = FixedU128::saturating_from_rational(10, 100*2000000);
-
-        let pool = Self::pool(id).unwrap();
-
-        let utilization_ratio;
-        if pool.supply == T::Balance::zero() {
-            utilization_ratio = FixedU128::zero();
-        } else {
-            utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
+        let pool = Self::pool(id);
+        if pool.is_none() {
+            return FixedU128::zero()
         }
-        if utilization_ratio <= utilization_optimal {
-            return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
-        } else {
-            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::one() - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;
-        }
+
+        let pool = pool.unwrap();
+
+        Self::debt_rate_internal(&pool)
     }
 
     // effective borrow limit; debt balance
