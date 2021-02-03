@@ -403,8 +403,8 @@ impl<T: Trait> Module<T> where
 			.expect("blockchain will not exceed 2^32 blocks; qed");
 
         // get rates and calculate interest
-        let supply_multiplier = FixedU128::saturating_from_integer(1) + Self::supply_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
-        let debt_multiplier = FixedU128::saturating_from_integer(1) + Self::debt_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
+        let supply_multiplier = FixedU128::one() + Self::supply_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
+        let debt_multiplier = FixedU128::one() + Self::debt_rate(asset_id) * FixedU128::saturating_from_integer(elapsed_time_u32);
 
         pool.supply = supply_multiplier.saturating_mul_int(pool.supply);
         pool.total_supply_index = pool.total_supply_index * supply_multiplier;
@@ -491,8 +491,8 @@ impl<T: Trait> Module<T> where
             liquidation_factor: FixedU128::saturating_from_rational(120, 100),
             safe_factor: FixedU128::saturating_from_rational(150, 100),
             liquidation_bonus: FixedU128::saturating_from_rational(105, 100),
-            total_supply_index: FixedU128::saturating_from_integer(1),
-            total_debt_index: FixedU128::saturating_from_integer(1),
+            total_supply_index: FixedU128::one(),
+            total_debt_index: FixedU128::one(),
             last_updated: <frame_system::Module<T>>::block_number(),
         };
 
@@ -518,7 +518,7 @@ impl<T: Trait> Module<T> where
         if utilization_ratio <= utilization_optimal {
             return utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero;
         } else {
-            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::saturating_from_integer(1) - utilization_optimal) +  borrow_rate_optimal;
+            return (utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::one() - utilization_optimal) +  borrow_rate_optimal;
         }
     }
 
@@ -540,7 +540,7 @@ impl<T: Trait> Module<T> where
         if utilization_ratio <= utilization_optimal {
             return (utilization_ratio * borrow_rate_net1 / utilization_optimal + borrow_rate_zero) * utilization_ratio;
         } else {
-            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::saturating_from_integer(1) - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;
+            return ((utilization_ratio - utilization_optimal) * borrow_rate_net2 / (FixedU128::one() - utilization_optimal) +  borrow_rate_optimal) * utilization_ratio;
         }
     }
 
