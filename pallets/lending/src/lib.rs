@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-    decl_event, decl_module, decl_storage, decl_error,
+    decl_event, decl_module, decl_storage, decl_error, ensure,
     StorageMap, Parameter,
 };
 use sp_runtime::{
@@ -138,6 +138,7 @@ decl_error! {
         NotEnoughLiquidity,
         InsufficientCollateral,
         PoolNotExist,
+        AssetNotCollateral,
 	}
 }
 
@@ -343,29 +344,37 @@ decl_module! {
 
         // arbitrager related
 
-        // #[weight = 1]
-        // fn liquidate(
-        //     origin,
-        //     target_user: T::AccountId,
-        //     pay_asset_id: T::AssetId,
-        //     get_asset_id: T::AssetId,
-        //     pay_asset_amount: T::Balance
-        // ) -> Result {
-        //     let account = ensure_signed(origin)?;
+        #[weight = 1]
+        fn liquidate(
+            origin,
+            target_user: T::AccountId,
+            pay_asset_id: T::AssetId,
+            get_asset_id: T::AssetId,
+            pay_asset_amount: T::Balance
+        ) -> Result {
+            let account = ensure_signed(origin)?;
 
-        //     // TODO check pool exists
-        //     // 1 check if get_asset_id is enabled as collatoral
-        //     // 2 accrue interest of pay and get asset
-        //     Self::accrue_interest(pay_asset_id);
-        //     Self::accrue_interest(get_asset_id);
-        //     // 3 check if target user is under liquidation condition
-        //     // 4 check if liquidation % is more than threshold 
-        //     // 5 transfer token from arbitrager
-        //     // 6 transfer collateral to arbitrager
-        //     // 7 recalculate target user's borrow and supply in 2 pools
+            // TODO check pool exists
+            
+            // 1 check if get_asset_id is enabled as collateral
+            let mut pay_pool = Self::pool(pay_asset_id).ok_or(Error::<T>::PoolNotExist)?;
+            let mut get_pool = Self::pool(get_asset_id).ok_or(Error::<T>::PoolNotExist)?;
 
-        //     Ok(())
-        // }
+			ensure!(get_pool.can_be_collateral, Error::<T>::AssetNotCollateral);
+
+
+
+            // 2 accrue interest of pay and get asset
+            Self::accrue_interest(pay_asset_id, &mut pay_pool);
+            Self::accrue_interest(get_asset_id, &mut get_pool);
+            // 3 check if target user is under liquidation condition
+            // 4 check if liquidation % is more than threshold 
+            // 5 transfer token from arbitrager
+            // 6 transfer collateral to arbitrager
+            // 7 recalculate target user's borrow and supply in 2 pools
+
+            Ok(())
+        }
         
         // governance related
 
