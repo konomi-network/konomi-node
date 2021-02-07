@@ -50,8 +50,6 @@ pub struct Pool<T: Trait> {
 
     pub debt: T::Balance,
 
-    pub liquidation_factor: FixedU128,
-
     pub safe_factor: FixedU128,
 
     pub liquidation_bonus: FixedU128,
@@ -124,6 +122,8 @@ decl_storage! {
         // TODO: use bit set
         pub UserSupplySet get(fn user_supply_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
         pub UserDebtSet get(fn user_debt_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
+
+        pub LiquidationThreshold get(fn get_liquidation_threshold): FixedU128 = FixedU128::one();
     }
 
     add_extra_genesis {
@@ -505,7 +505,6 @@ impl<T: Trait> Module<T> where
             asset: id,
             supply: T::Balance::zero(),
             debt: T::Balance::zero(),
-            liquidation_factor: FixedU128::saturating_from_rational(120, 100),
             safe_factor: FixedU128::saturating_from_rational(150, 100),
             liquidation_bonus: FixedU128::saturating_from_rational(105, 100),
             total_supply_index: FixedU128::one(),
