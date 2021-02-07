@@ -145,6 +145,8 @@ decl_error! {
         InsufficientCollateral,
         PoolNotExist,
         AssetNotCollateral,
+        UserNotExist,
+        AssetNotCollateralUser,
 	}
 }
 
@@ -360,19 +362,19 @@ decl_module! {
         ) -> Result {
             let account = ensure_signed(origin)?;
 
-            // TODO check pool exists
-            
-            // 1 check if get_asset_id is enabled as collateral
-            let mut pay_pool = Self::pool(pay_asset_id).ok_or(Error::<T>::PoolNotExist)?;
+            // check pool exists and get pool instances
+            // check if get_asset_id is enabled as collateral
             let mut get_pool = Self::pool(get_asset_id).ok_or(Error::<T>::PoolNotExist)?;
-
-			ensure!(get_pool.can_be_collateral, Error::<T>::AssetNotCollateral);
-
-
+            ensure!(get_pool.can_be_collateral, Error::<T>::AssetNotCollateral);
+            
+            let target_supply = Self::user_supply(get_asset_id, target_user).ok_or(Error::<T>::UserNotExist)?;
+            ensure!(target_supply.as_collateral, Error::<T>::AssetNotCollateralUser);
+            let mut pay_pool = Self::pool(pay_asset_id).ok_or(Error::<T>::PoolNotExist)?;
 
             // 2 accrue interest of pay and get asset
             Self::accrue_interest(pay_asset_id, &mut pay_pool);
             Self::accrue_interest(get_asset_id, &mut get_pool);
+            
             // 3 check if target user is under liquidation condition
             // 4 check if liquidation % is more than threshold 
             // 5 transfer token from arbitrager
