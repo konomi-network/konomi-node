@@ -74,8 +74,6 @@ pub struct UserSupply<T: Trait> {
 	pub amount: T::Balance,
 	/// Action of this swap.
     pub index: FixedU128,
-    
-    pub as_collateral: bool,
 }
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
@@ -339,17 +337,6 @@ decl_module! {
             Ok(())
         }
 
-        #[weight = 1]
-        fn choose_collateral(
-            origin,
-            asset_id: T::AssetId,
-            as_collateral: bool
-        ) -> Result {
-
-            // if from true -> false, need to check collateral
-            Ok(())
-        }
-
         // arbitrager related
 
         #[weight = 1]
@@ -367,8 +354,6 @@ decl_module! {
             let mut get_pool = Self::pool(get_asset_id).ok_or(Error::<T>::PoolNotExist)?;
             ensure!(get_pool.can_be_collateral, Error::<T>::AssetNotCollateral);
             
-            let target_supply = Self::user_supply(get_asset_id, target_user).ok_or(Error::<T>::UserNotExist)?;
-            ensure!(target_supply.as_collateral, Error::<T>::AssetNotCollateralUser);
             let mut pay_pool = Self::pool(pay_asset_id).ok_or(Error::<T>::PoolNotExist)?;
 
             // 2 accrue interest of pay and get asset
@@ -450,7 +435,6 @@ impl<T: Trait> Module<T> where
             let user_supply = UserSupply::<T> {
                 amount,
                 index: pool.total_supply_index,
-                as_collateral: true,
             };
             UserSupplies::<T>::insert(asset_id, account, user_supply);
         }
