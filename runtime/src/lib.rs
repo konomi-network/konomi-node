@@ -478,7 +478,7 @@ impl_runtime_apis! {
             Lending::debt_rate(id)
 		}
 		
-		fn get_user_info(user: AccountId) -> (Balance, Balance) {
+		fn get_user_info(user: AccountId) -> (Balance, Balance, Balance) {
 			Lending::get_user_info(user)
 		}
     }

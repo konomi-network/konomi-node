@@ -564,8 +564,8 @@ impl<T: Trait> Module<T> where
         Self::debt_rate_internal(&pool)
     }
 
-    // effective borrow limit; debt balance
-    pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance) {
+    // total supply balance; total debt balance; total borrow limit
+    pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance, T::Balance) {
         let mut supply_balance = T::Balance::zero();
         let mut borrow_limit = T::Balance::zero();
         for asset in Self::user_supply_set(user.clone()).into_iter() {
@@ -583,6 +583,6 @@ impl<T: Trait> Module<T> where
         }
 
 
-        (borrow_limit, debt_balance)
+        (borrow_limit, debt_balance, borrow_limit)
     }
 }
