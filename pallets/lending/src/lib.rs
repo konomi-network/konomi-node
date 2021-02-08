@@ -144,7 +144,6 @@ decl_error! {
         PoolNotExist,
         AssetNotCollateral,
         UserNotExist,
-        AssetNotCollateralUser,
 	}
 }
 
@@ -158,7 +157,6 @@ decl_module! {
 
         // end user related
  
-        // TODO: choose as collateral?
         #[weight = 1]
         fn supply(
             origin,
@@ -431,7 +429,7 @@ impl<T: Trait> Module<T> where
                 user_supply.amount -= amount;
             }
             UserSupplies::<T>::insert(asset_id, account, user_supply);
-        } else {
+        } else if amount != T::Balance::zero() {
             let user_supply = UserSupply::<T> {
                 amount,
                 index: pool.total_supply_index,
@@ -456,7 +454,7 @@ impl<T: Trait> Module<T> where
                 user_debt.amount -= amount;
             }
             UserDebts::<T>::insert(asset_id, account, user_debt);
-        } else {
+        } else if amount != T::Balance::zero() {
             let user_debt = UserDebt::<T> {
                 amount,
                 index: pool.total_debt_index,
