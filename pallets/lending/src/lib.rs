@@ -144,6 +144,7 @@ decl_error! {
         PoolNotExist,
         AssetNotCollateral,
         UserNotExist,
+        AboveLiquidationThreshold,
 	}
 }
 
@@ -359,10 +360,36 @@ decl_module! {
             Self::accrue_interest(get_asset_id, &mut get_pool);
             
             // 3 check if target user is under liquidation condition
+            // TODO: improve efficiency; check liquidation threshold
+            let (_, debt, debt_limit) = Self::get_user_info(target_user.clone());
+            ensure!(debt > debt_limit, Error::<T>::AboveLiquidationThreshold);
             // 4 check if liquidation % is more than threshold 
+
             // 5 transfer token from arbitrager
+            T::MultiAsset::transfer(
+                account.clone(),
+                pay_asset_id,
+                Self::account_id(),
+                pay_asset_amount, // TODO: cali the amount
+            ).map_err(|_| Error::<T>::TransferFailed)?;            
+
+            // TODO: calculate this
+            let get_asset_amount = pay_asset_amount;
+
             // 6 transfer collateral to arbitrager
+            T::MultiAsset::transfer(
+                Self::account_id(),
+                get_asset_id,
+                account.clone(),
+                get_asset_amount,
+            ).map_err(|_| Error::<T>::TransferFailed)?;
             // 7 recalculate target user's borrow and supply in 2 pools
+            Self::update_user_supply(&mut get_pool, get_asset_id, target_user.clone(), get_asset_amount, false);
+            Self::update_user_debt(&mut pay_pool, pay_asset_id, target_user, pay_asset_amount, false);
+
+            Pools::<T>::insert(get_asset_id, get_pool);
+            Pools::<T>::insert(pay_asset_id, pay_pool);
+
 
             Ok(())
         }
@@ -546,6 +573,7 @@ impl<T: Trait> Module<T> where
     }
 
     // total supply balance; total debt balance; total borrow limit
+    // TODO: this does not include interest
     pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance, T::Balance) {
         let mut supply_balance = T::Balance::zero();
         let mut borrow_limit = T::Balance::zero();
