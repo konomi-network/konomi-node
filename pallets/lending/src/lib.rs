@@ -52,6 +52,8 @@ pub struct Pool<T: Trait> {
 
     pub safe_factor: FixedU128,
 
+    pub close_factor: FixedU128, // < 1
+
     pub liquidation_bonus: FixedU128,
 
     pub total_supply_index: FixedU128,
@@ -145,6 +147,7 @@ decl_error! {
         AssetNotCollateral,
         UserNotExist,
         AboveLiquidationThreshold,
+        UserNoSupply,
 	}
 }
 
@@ -358,12 +361,22 @@ decl_module! {
             // 2 accrue interest of pay and get asset
             Self::accrue_interest(pay_asset_id, &mut pay_pool);
             Self::accrue_interest(get_asset_id, &mut get_pool);
+
+            // TODO: accure target user's interest
             
             // 3 check if target user is under liquidation condition
             // TODO: improve efficiency; check liquidation threshold
             let (_, debt, debt_limit) = Self::get_user_info(target_user.clone());
             ensure!(debt > debt_limit, Error::<T>::AboveLiquidationThreshold);
+        
             // 4 check if liquidation % is more than threshold 
+            // TODO: if target user supply is too small, enable total liquidation
+            let target_user_supply = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
+            let get_limit = get_pool.close_factor.saturating_mul_int(target_user_supply.amount);
+            
+            let pay_limit = get_limit * get_price / pay_price;
+            let target_user_debt = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
+
 
             // 5 transfer token from arbitrager
             T::MultiAsset::transfer(
@@ -387,9 +400,9 @@ decl_module! {
             Self::update_user_supply(&mut get_pool, get_asset_id, target_user.clone(), get_asset_amount, false);
             Self::update_user_debt(&mut pay_pool, pay_asset_id, target_user, pay_asset_amount, false);
 
+            // update pools
             Pools::<T>::insert(get_asset_id, get_pool);
             Pools::<T>::insert(pay_asset_id, pay_pool);
-
 
             Ok(())
         }
@@ -515,6 +528,7 @@ impl<T: Trait> Module<T> where
             supply: T::Balance::zero(),
             debt: T::Balance::zero(),
             safe_factor: FixedU128::saturating_from_rational(150, 100),
+            close_factor: FixedU128::one(),
             liquidation_bonus: FixedU128::saturating_from_rational(105, 100),
             total_supply_index: FixedU128::one(),
             total_debt_index: FixedU128::one(),
@@ -590,7 +604,6 @@ impl<T: Trait> Module<T> where
             let price = T::Oracle::get_rate(asset);
             debt_balance += price.saturating_mul_int(amount);
         }
-
 
         (borrow_limit, debt_balance, borrow_limit)
     }
