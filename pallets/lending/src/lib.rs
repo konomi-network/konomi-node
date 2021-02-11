@@ -169,7 +169,7 @@ decl_module! {
             // check pool exists and get pool instance
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // accrue pool interest
-            Self::accrue_interest(asset_id, &mut pool);
+            Self::accrue_interest(&mut pool);
             // transfer asset
             T::MultiAsset::transfer(
                 account.clone(), // TODO: use reference
@@ -208,7 +208,7 @@ decl_module! {
             // check pool exists and get pool instance
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // accrue pool interest
-            Self::accrue_interest(asset_id, &mut pool);
+            Self::accrue_interest(&mut pool);
 
             // TODO accure user's interest
             // TODO check collateral 
@@ -264,7 +264,7 @@ decl_module! {
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
 
             // accrue interest
-            Self::accrue_interest(asset_id, &mut pool);
+            Self::accrue_interest(&mut pool);
 
             // check pool cash = (deposit - borrow) > amount
             if (pool.supply - pool.debt) < amount {
@@ -311,7 +311,7 @@ decl_module! {
             // check pool exists and get pool instance
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // accrue interest
-            Self::accrue_interest(asset_id, &mut pool);
+            Self::accrue_interest(&mut pool);
 
             // TODO: accrue user's interest
 
@@ -368,8 +368,8 @@ decl_module! {
             let mut pay_pool = Self::pool(pay_asset_id).ok_or(Error::<T>::PoolNotExist)?;
 
             // 2 accrue interest of pay and get asset
-            Self::accrue_interest(pay_asset_id, &mut pay_pool);
-            Self::accrue_interest(get_asset_id, &mut get_pool);
+            Self::accrue_interest(&mut pay_pool);
+            Self::accrue_interest(&mut get_pool);
 
             // TODO: accrue target user's interest
             
@@ -450,7 +450,7 @@ impl<T: Trait> Module<T> where
 		PALLET_ID.into_account()
     }
     
-    fn accrue_interest(asset_id: T::AssetId, pool: &mut Pool<T>) {
+    fn accrue_interest(pool: &mut Pool<T>) {
         if pool.last_updated == <frame_system::Module<T>>::block_number() {
             return
         }
