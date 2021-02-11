@@ -374,20 +374,30 @@ decl_module! {
             let target_user_supply = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
             let get_limit = get_pool.close_factor.saturating_mul_int(target_user_supply.amount);
             
-            let pay_limit = get_limit * get_price / pay_price;
+            let get_price = T::Oracle::get_rate(get_asset_id);
+            let pay_price = T::Oracle::get_rate(pay_asset_id);
+            let pay_limit = (get_price / pay_price).saturating_mul_int(get_limit);
             let target_user_debt = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
 
+            let mut pay_asset_amount = pay_asset_amount;
+            
+            if pay_asset_amount < pay_limit {
+                pay_asset_amount = pay_limit;
+            }
+
+            if pay_asset_amount < target_user_debt.amount {
+                pay_asset_amount = target_user_debt.amount;
+            }
+
+            let get_asset_amount = (pay_price / get_price).saturating_mul_int(pay_asset_amount);
 
             // 5 transfer token from arbitrager
             T::MultiAsset::transfer(
                 account.clone(),
                 pay_asset_id,
                 Self::account_id(),
-                pay_asset_amount, // TODO: cali the amount
+                pay_asset_amount,
             ).map_err(|_| Error::<T>::TransferFailed)?;            
-
-            // TODO: calculate this
-            let get_asset_amount = pay_asset_amount;
 
             // 6 transfer collateral to arbitrager
             T::MultiAsset::transfer(
