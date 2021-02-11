@@ -606,16 +606,17 @@ impl<T: Trait> Module<T> where
         Self::debt_rate_internal(&pool)
     }
 
-    // total supply balance; total debt balance; total borrow limit
+    // total supply balance; total converted supply balance; total debt balance;
     // TODO: this does not include interest
     pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance, T::Balance) {
         let mut supply_balance = T::Balance::zero();
-        let mut borrow_limit = T::Balance::zero();
+        let mut supply_converted = T::Balance::zero();
         for asset in Self::user_supply_set(user.clone()).into_iter() {
             let amount = Self::user_supply(asset, user.clone()).unwrap().amount;
             let price = T::Oracle::get_rate(asset);
             supply_balance += price.saturating_mul_int(amount);
-            borrow_limit += price.saturating_mul_int(amount) * T::Balance::from(10) / T::Balance::from(15);
+            // TODO: optimize this
+            supply_converted += (price * Self::pool(asset).unwrap().safe_factor).saturating_mul_int(amount);
         }
 
         let mut debt_balance = T::Balance::zero();
@@ -625,6 +626,6 @@ impl<T: Trait> Module<T> where
             debt_balance += price.saturating_mul_int(amount);
         }
 
-        (borrow_limit, debt_balance, borrow_limit)
+        (supply_balance, supply_converted, debt_balance)
     }
 }
