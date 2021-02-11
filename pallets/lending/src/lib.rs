@@ -144,6 +144,7 @@ decl_error! {
         AssetNotCollateral,
         UserNotExist,
         AboveLiquidationThreshold,
+        BelowLiquidationThreshold,
         UserNoSupply,
         UserNoDebt, 
 	}
@@ -211,7 +212,12 @@ decl_module! {
             Self::accrue_interest(&mut pool);
 
             // TODO accure user's interest
-            // TODO check collateral 
+
+            // check collateral 
+            let (_, converted_supply, converted_borrow) = Self::get_user_info(account.clone());
+            let price = T::Oracle::get_rate(asset_id);
+            let converted_supply = converted_supply - (price * pool.safe_factor).saturating_mul_int(amount);
+            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) < converted_supply, Error::<T>::BelowLiquidationThreshold);
             
             // pre-check amount
             // supply can not be zero (if so it will be eliminated)
@@ -271,8 +277,13 @@ decl_module! {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
 
-            // TODO: check collateral
             // TODO: need to accrue user interest first
+
+            // check collateral
+            let (_, converted_supply, converted_borrow) = Self::get_user_info(account.clone());
+            let price = T::Oracle::get_rate(asset_id);
+            let converted_borrow = converted_borrow + price.saturating_mul_int(amount);
+            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) < converted_supply, Error::<T>::BelowLiquidationThreshold);
 
             // transfer asset to user
             T::MultiAsset::transfer(
@@ -375,7 +386,7 @@ decl_module! {
             
             // 3 check if target user is under liquidation condition
             let (_, converted_supply, converted_borrow) = Self::get_user_info(target_user.clone());
-            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) > converted_supply, Error::<T>::AboveLiquidationThreshold); // TODO: use liquidation threshold and health factor
+            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) > converted_supply, Error::<T>::AboveLiquidationThreshold);
         
             // 4 check if liquidation % is more than threshold 
             // TODO: if target user supply is too small, enable total liquidation
