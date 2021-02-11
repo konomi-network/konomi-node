@@ -374,9 +374,8 @@ decl_module! {
             // TODO: accrue target user's interest
             
             // 3 check if target user is under liquidation condition
-            // TODO: improve efficiency; check liquidation threshold
-            let (_, debt, debt_limit) = Self::get_user_info(target_user.clone());
-            ensure!(debt > debt_limit, Error::<T>::AboveLiquidationThreshold); // TODO: use liquidation threshold and health factor
+            let (_, converted_supply, converted_borrow) = Self::get_user_info(target_user.clone());
+            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) > converted_supply, Error::<T>::AboveLiquidationThreshold); // TODO: use liquidation threshold and health factor
         
             // 4 check if liquidation % is more than threshold 
             // TODO: if target user supply is too small, enable total liquidation
