@@ -51,7 +51,7 @@ pub struct Pool<T: Trait> {
 
     pub close_factor: FixedU128, // < 1
 
-    pub liquidation_bonus: FixedU128,
+    pub discount_factor: FixedU128,
 
     pub total_supply_index: FixedU128,
 
@@ -385,7 +385,7 @@ decl_module! {
             
             let get_price = T::Oracle::get_rate(get_asset_id);
             let pay_price = T::Oracle::get_rate(pay_asset_id);
-            let pay_limit = (get_price / pay_price).saturating_mul_int(get_limit);
+            let pay_limit = (get_price / pay_price * get_pool.discount_factor).saturating_mul_int(get_limit);
             let target_user_debt = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
 
             let mut pay_asset_amount = pay_asset_amount;
@@ -398,7 +398,8 @@ decl_module! {
                 pay_asset_amount = target_user_debt.amount;
             }
 
-            let get_asset_amount = (pay_price / get_price).saturating_mul_int(pay_asset_amount);
+            // TODO: check rounding errors due to discount_factor
+            let get_asset_amount = (pay_price / get_price / get_pool.discount_factor ).saturating_mul_int(pay_asset_amount);
 
             // 5 transfer token from arbitrager
             T::MultiAsset::transfer(
@@ -548,7 +549,7 @@ impl<T: Trait> Module<T> where
             debt: T::Balance::zero(),
             safe_factor: FixedU128::saturating_from_rational(150, 100),
             close_factor: FixedU128::one(),
-            liquidation_bonus: FixedU128::saturating_from_rational(105, 100),
+            discount_factor: FixedU128::saturating_from_rational(95, 100),
             total_supply_index: FixedU128::one(),
             total_debt_index: FixedU128::one(),
             last_updated: <frame_system::Module<T>>::block_number(),
