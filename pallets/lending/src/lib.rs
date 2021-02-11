@@ -451,7 +451,6 @@ impl<T: Trait> Module<T> where
     }
     
     fn accrue_interest(asset_id: T::AssetId, pool: &mut Pool<T>) {
-        // TODO use compound interest
         if pool.last_updated == <frame_system::Module<T>>::block_number() {
             return
         }
@@ -472,6 +471,7 @@ impl<T: Trait> Module<T> where
         pool.debt = debt_multiplier.saturating_mul_int(pool.debt);
         pool.total_debt_index = pool.total_debt_index * debt_multiplier;
 
+        pool.last_updated = <frame_system::Module<T>>::block_number();
     }
 
     // TODO: if final amount = 0, clean up
