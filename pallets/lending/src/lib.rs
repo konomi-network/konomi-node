@@ -145,6 +145,7 @@ decl_error! {
         UserNotExist,
         AboveLiquidationThreshold,
         UserNoSupply,
+        UserNoDebt, 
 	}
 }
 
@@ -167,7 +168,7 @@ decl_module! {
 
             // check pool exists and get pool instance
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
-            // accrue interest
+            // accrue pool interest
             Self::accrue_interest(asset_id, &mut pool);
             // transfer asset
             T::MultiAsset::transfer(
@@ -206,21 +207,25 @@ decl_module! {
 
             // check pool exists and get pool instance
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
-            // accrue interest
+            // accrue pool interest
             Self::accrue_interest(asset_id, &mut pool);
-            // check collateral TODO need to first update user's supply to check the latest ratio...
+
+            // TODO accure user's interest
+            // TODO check collateral 
             
             // pre-check amount
-            // TODO: what if user supply is zero?
+            // supply can not be zero (if so it will be eliminated)
             let mut amount = amount;
             if let Some(user_supply) = Self::user_supply(asset_id, account.clone()) {
                 if user_supply.amount < amount {
                     amount = user_supply.amount;
                 }
+            } else {
+                Err(Error::<T>::UserNoSupply)?
             }
 
             // check pool cash = (deposit - borrow) > amount
-            if (pool.supply - pool.debt) < amount {
+            if (pool.supply - pool.debt) <= amount {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
 
@@ -260,12 +265,14 @@ decl_module! {
 
             // accrue interest
             Self::accrue_interest(asset_id, &mut pool);
-            // check collateral
 
             // check pool cash = (deposit - borrow) > amount
             if (pool.supply - pool.debt) < amount {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
+
+            // TODO: check collateral
+            // TODO: need to accrue user interest first
 
             // transfer asset to user
             T::MultiAsset::transfer(
@@ -305,13 +312,8 @@ decl_module! {
             let mut pool = Self::pool(asset_id).ok_or(Error::<T>::PoolNotExist)?;
             // accrue interest
             Self::accrue_interest(asset_id, &mut pool);
-            // transfer token from user
-            T::MultiAsset::transfer(
-                account.clone(), // TODO: use reference
-                asset_id,
-                Self::account_id(),
-                amount,
-            ).map_err(|_| Error::<T>::TransferFailed)?;
+
+            // TODO: accrue user's interest
 
             // pre-check amount
             let mut amount = amount;
@@ -319,7 +321,17 @@ decl_module! {
                 if user_debt.amount < amount {
                     amount = user_debt.amount;
                 }
+            } else {
+                Err(Error::<T>::UserNoDebt)?
             }
+
+            // transfer token from user
+            T::MultiAsset::transfer(
+                account.clone(),
+                asset_id,
+                Self::account_id(),
+                amount,
+            ).map_err(|_| Error::<T>::TransferFailed)?;
 
             // update user Borrow
             Self::update_user_debt(&pool, asset_id, account.clone(), amount, false);
@@ -359,12 +371,12 @@ decl_module! {
             Self::accrue_interest(pay_asset_id, &mut pay_pool);
             Self::accrue_interest(get_asset_id, &mut get_pool);
 
-            // TODO: accure target user's interest
+            // TODO: accrue target user's interest
             
             // 3 check if target user is under liquidation condition
             // TODO: improve efficiency; check liquidation threshold
             let (_, debt, debt_limit) = Self::get_user_info(target_user.clone());
-            ensure!(debt > debt_limit, Error::<T>::AboveLiquidationThreshold);
+            ensure!(debt > debt_limit, Error::<T>::AboveLiquidationThreshold); // TODO: use liquidation threshold and health factor
         
             // 4 check if liquidation % is more than threshold 
             // TODO: if target user supply is too small, enable total liquidation
