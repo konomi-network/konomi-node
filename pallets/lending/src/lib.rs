@@ -17,9 +17,6 @@ use sp_std::{vec::Vec, convert::TryInto};
 use codec::{Encode, Decode};
 use traits::{Oracle, MultiAsset};
 
-// TODO: fee, reserves
-// TODO: child storage
-
 const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 
 /// The module's configuration trait.
@@ -380,7 +377,7 @@ decl_module! {
             let target_user_debt = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
 
             let mut pay_asset_amount = pay_asset_amount;
-            
+
             if pay_asset_amount < pay_limit {
                 pay_asset_amount = pay_limit;
             }
