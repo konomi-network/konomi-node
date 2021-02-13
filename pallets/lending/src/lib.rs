@@ -250,8 +250,6 @@ decl_module! {
 
             Self::deposit_event(RawEvent::Withdrawn(asset_id, account, amount));
 
-            // TODO: if supply = 0, delete user supply & clear user's supply set
-
             // commit pool change to storage
             Pools::<T>::insert(asset_id, pool);
 
@@ -351,8 +349,6 @@ decl_module! {
             Self::update_pool_debt(&mut pool, amount, false);
 
             Self::deposit_event(RawEvent::Repaid(asset_id, account, amount));
-
-            // TODO: if debt = 0 delete user debt and user's debt set
 
             // commit pool change to storage
             Pools::<T>::insert(asset_id, pool);
@@ -487,8 +483,7 @@ impl<T: Trait> Module<T> where
         pool.last_updated = <frame_system::Module<T>>::block_number();
     }
 
-    // TODO: if final amount = 0, clean up
-    // TODO: return the actual - value if clean up
+    // amount is pre-checked so will no be negative
     fn update_user_supply(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
         if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
 
@@ -501,7 +496,15 @@ impl<T: Trait> Module<T> where
             } else {
                 user_supply.amount -= amount;
             }
-            UserSupplies::<T>::insert(asset_id, account, user_supply);
+            if user_supply.amount != T::Balance::zero() {
+                UserSupplies::<T>::insert(asset_id, account, user_supply);
+            } else {
+                UserSupplies::<T>::remove(asset_id, account.clone());
+                // update user's supply asset set
+                let mut assets = Self::user_supply_set(account.clone());
+                assets.retain(|x| *x != asset_id);
+                UserSupplySet::<T>::insert(account, assets);
+            }
         } else if amount != T::Balance::zero() {
             let user_supply = UserSupply::<T> {
                 amount,
@@ -512,8 +515,7 @@ impl<T: Trait> Module<T> where
 
     }
 
-    // TODO: if final amount = 0, clean up
-    // TODO: return the actual - value if clean up
+    // amount is pre-checked so will no be negative
     fn update_user_debt(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
 
         if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
@@ -526,7 +528,15 @@ impl<T: Trait> Module<T> where
             } else {
                 user_debt.amount -= amount;
             }
-            UserDebts::<T>::insert(asset_id, account, user_debt);
+            if user_debt.amount != T::Balance::zero() {
+                UserDebts::<T>::insert(asset_id, account, user_debt);
+            } else {
+                UserDebts::<T>::remove(asset_id, account.clone());
+                // update user's debt asset set
+                let mut assets = Self::user_debt_set(account.clone());
+                assets.retain(|x| *x != asset_id);
+                UserDebtSet::<T>::insert(account, assets);
+            }
         } else if amount != T::Balance::zero() {
             let user_debt = UserDebt::<T> {
                 amount,
