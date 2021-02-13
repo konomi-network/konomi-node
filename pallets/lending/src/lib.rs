@@ -209,7 +209,7 @@ decl_module! {
             // accrue pool interest
             Self::accrue_interest(&mut pool);
 
-            // accure user's interest
+            // accrue user's interest
             Self::accrue_supply_with_interest(&pool, asset_id, account.clone());
 
             // check collateral 
