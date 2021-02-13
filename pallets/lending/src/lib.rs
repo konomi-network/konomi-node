@@ -570,14 +570,14 @@ impl<T: Trait> Module<T> where
             asset: id,
             supply: T::Balance::zero(),
             debt: T::Balance::zero(),
-            safe_factor: FixedU128::saturating_from_rational(150, 100),
+            safe_factor: FixedU128::saturating_from_rational(7, 10),
             close_factor: FixedU128::one(),
             discount_factor: FixedU128::saturating_from_rational(95, 100),
             total_supply_index: FixedU128::one(),
             total_debt_index: FixedU128::one(),
             last_updated: <frame_system::Module<T>>::block_number(),
-            utilization_factor: FixedU128::one(), // tmps
-            initial_interest_rate: FixedU128::one(),
+            utilization_factor: FixedU128::saturating_from_rational(385, 10000000000u64),
+            initial_interest_rate: FixedU128::saturating_from_rational(385, 100000000000u64),
         };
 
         Pools::<T>::insert(id, pool);
