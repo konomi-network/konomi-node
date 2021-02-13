@@ -61,9 +61,7 @@ pub struct Pool<T: Trait> {
 
     pub utilization_factor: FixedU128,
 
-    pub initial_interest_rate_supply: FixedU128,
-
-    pub initial_interest_rate_debt: FixedU128,
+    pub initial_interest_rate: FixedU128,
     
 }
 
@@ -564,33 +562,28 @@ impl<T: Trait> Module<T> where
             total_debt_index: FixedU128::one(),
             last_updated: <frame_system::Module<T>>::block_number(),
             utilization_factor: FixedU128::one(), // tmps
-            initial_interest_rate_supply: FixedU128::one(),
-            initial_interest_rate_debt: FixedU128::one(),
+            initial_interest_rate: FixedU128::one(),
         };
 
         Pools::<T>::insert(id, pool);
     }
 
     fn supply_rate_internal(pool: &Pool<T>) -> FixedU128 {
-        let utilization_ratio;
         if pool.supply == T::Balance::zero() {
-            utilization_ratio = FixedU128::zero();
-        } else {
-            utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
-        }
+            return FixedU128::zero();
+        } 
 
-        pool.initial_interest_rate_supply + pool.utilization_factor * utilization_ratio
+        let utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
+        Self::debt_rate_internal(pool) * utilization_ratio
     }
 
     fn debt_rate_internal(pool: &Pool<T>) -> FixedU128 {
-        let utilization_ratio;
         if pool.supply == T::Balance::zero() {
-            utilization_ratio = FixedU128::zero();
-        } else {
-            utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
-        }
+            return pool.initial_interest_rate;
+        } 
 
-        pool.initial_interest_rate_debt + pool.utilization_factor * utilization_ratio
+        let utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
+        pool.initial_interest_rate + pool.utilization_factor * utilization_ratio
     }
 
     /// runtime apis
@@ -638,4 +631,5 @@ impl<T: Trait> Module<T> where
 
         (supply_balance, supply_converted, debt_balance)
     }
+
 }
