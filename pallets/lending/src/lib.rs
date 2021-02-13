@@ -171,7 +171,7 @@ decl_module! {
             Self::accrue_interest(&mut pool);
             // transfer asset
             T::MultiAsset::transfer(
-                account.clone(), // TODO: use reference
+                account.clone(),
                 asset_id,
                 Self::account_id(),
                 amount,
@@ -615,7 +615,6 @@ impl<T: Trait> Module<T> where
     }
 
     // total supply balance; total converted supply balance; total debt balance;
-    // TODO: this does not include interest
     pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance, T::Balance) {
         let mut supply_balance = T::Balance::zero();
         let mut supply_converted = T::Balance::zero();
