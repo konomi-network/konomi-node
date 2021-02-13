@@ -615,7 +615,7 @@ impl<T: Trait> Module<T> where
         let mut supply_balance = T::Balance::zero();
         let mut supply_converted = T::Balance::zero();
         for asset in Self::user_supply_set(user.clone()).into_iter() {
-            let amount = Self::user_supply(asset, user.clone()).unwrap().amount;
+            let amount = Self::get_user_supply_with_interest(asset, user.clone());
             let price = T::Oracle::get_rate(asset);
             supply_balance += price.saturating_mul_int(amount);
             // TODO: optimize this
@@ -624,7 +624,7 @@ impl<T: Trait> Module<T> where
 
         let mut debt_balance = T::Balance::zero();
         for asset in Self::user_debt_set(user.clone()).into_iter() {
-            let amount = Self::user_debt(asset, user.clone()).unwrap().amount;
+            let amount = Self::get_user_debt_with_interest(asset, user.clone());
             let price = T::Oracle::get_rate(asset);
             debt_balance += price.saturating_mul_int(amount);
         }
@@ -632,4 +632,51 @@ impl<T: Trait> Module<T> where
         (supply_balance, supply_converted, debt_balance)
     }
 
+    fn get_user_debt_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
+
+        let total_debt_index;
+
+        if let Some(pool) = Self::pool(asset_id) {
+            let interval_block_number = <frame_system::Module<T>>::block_number() - pool.last_updated;
+            let elapsed_time_u32 = TryInto::<u32>::try_into(interval_block_number)
+                .ok()
+                .expect("blockchain will not exceed 2^32 blocks; qed");
+    
+            let debt_multiplier = FixedU128::one() + Self::debt_rate_internal(&pool) * FixedU128::saturating_from_integer(elapsed_time_u32);
+            total_debt_index = pool.total_debt_index * debt_multiplier;
+
+        } else {
+            return T::Balance::zero()
+        }
+
+        if let Some(user_debt) = Self::user_debt(asset_id, user) {
+            (total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount)
+        } else {
+            T::Balance::zero()
+        }
+    }
+
+    fn get_user_supply_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
+
+        let total_supply_index;
+
+        if let Some(pool) = Self::pool(asset_id) {
+            let interval_block_number = <frame_system::Module<T>>::block_number() - pool.last_updated;
+            let elapsed_time_u32 = TryInto::<u32>::try_into(interval_block_number)
+                .ok()
+                .expect("blockchain will not exceed 2^32 blocks; qed");
+    
+            let supply_multiplier = FixedU128::one() + Self::supply_rate_internal(&pool) * FixedU128::saturating_from_integer(elapsed_time_u32);
+            total_supply_index = pool.total_supply_index * supply_multiplier;
+
+        } else {
+            return T::Balance::zero()
+        }
+
+        if let Some(user_supply) = Self::user_supply(asset_id, user) {
+            (total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount)
+        } else {
+            T::Balance::zero()
+        }
+    }
 }
