@@ -209,7 +209,8 @@ decl_module! {
             // accrue pool interest
             Self::accrue_interest(&mut pool);
 
-            // TODO accure user's interest
+            // accure user's interest
+            Self::accrue_supply_with_interest(&pool, asset_id, account.clone());
 
             // check collateral 
             let (_, converted_supply, converted_borrow) = Self::get_user_info(account.clone());
@@ -275,7 +276,8 @@ decl_module! {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
 
-            // TODO: need to accrue user interest first
+            // need to accrue user interest first
+            Self::accrue_debt_with_interest(&pool, asset_id, account.clone());
 
             // check collateral
             let (_, converted_supply, converted_borrow) = Self::get_user_info(account.clone());
@@ -322,7 +324,8 @@ decl_module! {
             // accrue interest
             Self::accrue_interest(&mut pool);
 
-            // TODO: accrue user's interest
+            // accrue user's interest
+            Self::accrue_debt_with_interest(&pool, asset_id, account.clone());
 
             // pre-check amount
             let mut amount = amount;
@@ -380,7 +383,9 @@ decl_module! {
             Self::accrue_interest(&mut pay_pool);
             Self::accrue_interest(&mut get_pool);
 
-            // TODO: accrue target user's interest
+            // accrue target user's interest
+            Self::accrue_supply_with_interest(&get_pool, get_asset_id, target_user.clone());
+            Self::accrue_debt_with_interest(&pay_pool, pay_asset_id, target_user.clone());
             
             // 3 check if target user is under liquidation condition
             let (_, converted_supply, converted_borrow) = Self::get_user_info(target_user.clone());
@@ -679,4 +684,25 @@ impl<T: Trait> Module<T> where
             T::Balance::zero()
         }
     }
+
+    // pool interest is already accrued
+    fn accrue_debt_with_interest(pool: &Pool<T>, asset_id: T::AssetId, user: T::AccountId) {
+
+        if let Some(mut user_debt) = Self::user_debt(asset_id, user.clone()) {
+            user_debt.amount = (pool.total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount);
+            user_debt.index = pool.total_debt_index;
+            UserDebts::<T>::insert(asset_id, user, user_debt);
+        } 
+    }
+
+    // pool interest is already accrued
+    fn accrue_supply_with_interest(pool: &Pool<T>, asset_id: T::AssetId, user: T::AccountId) {
+
+        if let Some(mut user_supply) = Self::user_supply(asset_id, user.clone()) {
+            user_supply.amount = (pool.total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount);
+            user_supply.index = pool.total_supply_index;
+            UserSupplies::<T>::insert(asset_id, user, user_supply);
+        } 
+    }
+
 }
