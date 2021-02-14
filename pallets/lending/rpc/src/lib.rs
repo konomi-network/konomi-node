@@ -15,21 +15,21 @@ pub use pallet_lending_rpc_runtime_api::LendingApi as LendingRuntimeApi;
 #[rpc]
 pub trait LendingApi<BlockHash, AssetId, FixedU128, AccountId, Balance> {
 
-    #[rpc(name = "lending_supply_rate")]
+    #[rpc(name = "lending_supplyRate")]
     fn supply_rate(
         &self,
         id: AssetId,
         at: Option<BlockHash>
     ) -> Result<FixedU128>;
 
-    #[rpc(name = "lending_debt_rate")]
+    #[rpc(name = "lending_debtRate")]
     fn debt_rate(
         &self,
         id: AssetId,
         at: Option<BlockHash>
     ) -> Result<FixedU128>;
 
-    #[rpc(name = "lending_get_user_info")]
+    #[rpc(name = "lending_getUserInfo")]
     fn get_user_info(
         &self,
         user: AccountId,
