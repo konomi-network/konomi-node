@@ -34,7 +34,7 @@ pub trait LendingApi<BlockHash, AssetId, FixedU128, AccountId, Balance> {
         &self,
         user: AccountId,
         at: Option<BlockHash>
-    ) -> Result<(Balance, Balance, Balance)>;
+    ) -> Result<(u64, u64, u64)>;
 }
 
 /// A struct that implements the `SumStorageApi`.
@@ -105,7 +105,7 @@ where
         &self,
         user: AccountId,
         at: Option<<Block as BlockT>::Hash>
-    ) -> Result<(Balance, Balance, Balance)> {
+    ) -> Result<(u64, u64, u64)> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(||
             // If the block hash is not supplied assume the best block.

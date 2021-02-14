@@ -10,6 +10,7 @@ use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	FixedU128,
+	SaturatedConversion,
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
@@ -478,8 +479,9 @@ impl_runtime_apis! {
             Lending::debt_rate(id)
 		}
 		
-		fn get_user_info(user: AccountId) -> (Balance, Balance, Balance) {
-			Lending::get_user_info(user)
+		fn get_user_info(user: AccountId) -> (u64, u64, u64) {
+			let (a, b, c) = Lending::get_user_info(user);
+			(a.saturated_into(), b.saturated_into(), c.saturated_into())
 		}
     }
 
