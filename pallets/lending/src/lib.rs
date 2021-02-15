@@ -395,15 +395,15 @@ decl_module! {
             let get_price = T::Oracle::get_rate(get_asset_id);
             let pay_price = T::Oracle::get_rate(pay_asset_id);
             let pay_limit = (get_price / pay_price * get_pool.discount_factor).saturating_mul_int(get_limit);
-            let target_user_debt = Self::user_supply(get_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
+            let target_user_debt = Self::user_debt(pay_asset_id, target_user.clone()).ok_or(Error::<T>::UserNoSupply)?;
 
             let mut pay_asset_amount = pay_asset_amount;
 
-            if pay_asset_amount < pay_limit {
+            if pay_asset_amount > pay_limit {
                 pay_asset_amount = pay_limit;
             }
 
-            if pay_asset_amount < target_user_debt.amount {
+            if pay_asset_amount > target_user_debt.amount {
                 pay_asset_amount = target_user_debt.amount;
             }
 
