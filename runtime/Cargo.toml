@@ -28,6 +28,7 @@ serde = { features = ['derive'], optional = true, version = '1.0.119' }
 pallet-assets = { path = '../pallets/assets', default-features = false, version = '2.0.1' }
 pallet-swap = { path = '../pallets/swap', default-features = false, version = '2.0.1' }
 pallet-lending = { path = '../pallets/lending', default-features = false, version = '2.0.1' }
+pallet-offchain-worker = { path = '../pallets/offchain-worker', default-features = false, version = '2.0.1' }
 pallet-swap-rpc-runtime-api = { version = "0.8.1", default-features = false, path = "../pallets/swap/rpc/runtime-api/" }
 pallet-lending-rpc-runtime-api = { version = "0.8.1", default-features = false, path = "../pallets/lending/rpc/runtime-api/" }
 
@@ -84,6 +85,7 @@ std = [
     'pallet-sudo/std',
     'pallet-swap/std',
     'pallet-assets/std',
+    'pallet-offchain-worker/std',
     'pallet-timestamp/std',
     'pallet-transaction-payment/std',
     'pallet-transaction-payment-rpc-runtime-api/std',

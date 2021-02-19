@@ -2631,6 +2631,7 @@ dependencies = [
  "pallet-grandpa",
  "pallet-lending",
  "pallet-lending-rpc-runtime-api",
+ "pallet-offchain-worker",
  "pallet-randomness-collective-flip",
  "pallet-sudo",
  "pallet-swap",
@@ -3214,6 +3215,24 @@ dependencies = [
  "failure",
  "nalgebra",
  "statrs",
+]
+
+[[package]]
+name = "lite-json"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0460d985423a026b4d9b828a7c6eed1bcf606f476322f3f9b507529686a61715"
+dependencies = [
+ "lite-parser",
+]
+
+[[package]]
+name = "lite-parser"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c50092e40e0ccd1bf2015a10333fde0502ff95b832b0895dc1ca0d7ac6c52f6"
+dependencies = [
+ "paste",
 ]
 
 [[package]]
@@ -3881,6 +3900,21 @@ version = "0.8.1"
 dependencies = [
  "parity-scale-codec",
  "sp-api",
+]
+
+[[package]]
+name = "pallet-offchain-worker"
+version = "2.0.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "lite-json",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

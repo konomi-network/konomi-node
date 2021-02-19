@@ -7,5 +7,6 @@ members = [
     'pallets/assets',
     'pallets/swap',
     'pallets/lending',
+    'pallets/offchain-worker',
     'runtime',
 ]
