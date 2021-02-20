@@ -289,7 +289,7 @@ impl pallet_lending::Trait for Runtime {
 
 
 parameter_types! {
-	pub const UnsignedInterval: BlockNumber = 10;
+	pub const UnsignedInterval: BlockNumber = 4;
 	pub const UnsignedPriority: u32 = 5;
 }
 
@@ -376,7 +376,7 @@ construct_runtime!(
 		Assets: pallet_assets::{Module, Call, Storage, Config<T>, Event<T>},		
 		Swap: pallet_swap::{Module, Call, Storage, Config<T>, Event<T>},
 		Lending: pallet_lending::{Module, Call, Storage, Config<T>, Event<T>},
-		OffchainWorkerModule: pallet_offchain_worker::{Module, Call, Storage, Event<T>, ValidateUnsigned},
+		OffchainWorker: pallet_offchain_worker::{Module, Call, Storage, Event<T>, ValidateUnsigned},
 	}
 );
 

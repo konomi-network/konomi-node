@@ -3909,6 +3909,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "lite-json",
+ "pallet-assets",
  "parity-scale-codec",
  "serde",
  "sp-core",

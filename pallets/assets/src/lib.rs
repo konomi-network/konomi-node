@@ -193,7 +193,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn _set_price(id: T::AssetId, price: FixedU128) {
+    pub fn _set_price(id: T::AssetId, price: FixedU128) {
         <Price<T>>::insert(id, price);
     }
 
