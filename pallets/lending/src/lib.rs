@@ -212,12 +212,6 @@ decl_module! {
             // accrue user's interest
             Self::accrue_supply_with_interest(&pool, asset_id, account.clone());
 
-            // check collateral 
-            let (_, converted_supply, converted_borrow) = Self::get_user_info(account.clone());
-            let price = T::Oracle::get_rate(asset_id);
-            let converted_supply = converted_supply - (price * pool.safe_factor).saturating_mul_int(amount);
-            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) < converted_supply, Error::<T>::BelowLiquidationThreshold);
-            
             // pre-check amount
             // supply can not be zero (if so it will be eliminated)
             let mut amount = amount;
@@ -228,6 +222,12 @@ decl_module! {
             } else {
                 Err(Error::<T>::UserNoSupply)?
             }
+
+            // check collateral 
+            let (_, converted_supply, converted_borrow) = Self::get_user_info(account.clone());
+            let price = T::Oracle::get_rate(asset_id);
+            let converted_supply = converted_supply - (price * pool.safe_factor).saturating_mul_int(amount);
+            ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) < converted_supply, Error::<T>::BelowLiquidationThreshold);
 
             // check pool cash = (deposit - borrow) > amount
             if (pool.supply - pool.debt) <= amount {
