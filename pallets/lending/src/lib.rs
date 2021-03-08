@@ -646,7 +646,7 @@ impl<T: Trait> Module<T> where
         (supply_balance, supply_converted, debt_balance)
     }
 
-    fn get_user_debt_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
+    pub fn get_user_debt_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
 
         let total_debt_index;
 
@@ -670,7 +670,7 @@ impl<T: Trait> Module<T> where
         }
     }
 
-    fn get_user_supply_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
+    pub fn get_user_supply_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
 
         let total_supply_index;
 

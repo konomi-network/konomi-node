@@ -14,5 +14,10 @@ sp_api::decl_runtime_apis! {
 
         // effective supply balance; borrow balance
         fn get_user_info(user: AccountId) -> (u64, u64, u64);
+
+        fn get_user_debt_with_interest(asset_id: AssetId, user: AccountId) -> Balance;
+
+        fn get_user_supply_with_interest(asset_id: AssetId, user: AccountId) -> Balance;
+
     }
 }

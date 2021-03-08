@@ -35,6 +35,23 @@ pub trait LendingApi<BlockHash, AssetId, FixedU128, AccountId, Balance> {
         user: AccountId,
         at: Option<BlockHash>
     ) -> Result<(u64, u64, u64)>;
+
+    #[rpc(name = "lending_getUserDebtWithInterest")]
+    fn get_user_debt_with_interest(
+        &self,
+        asset_id: AssetId, 
+        user: AccountId,
+        at: Option<BlockHash>
+    ) -> Result<Balance>;
+
+    #[rpc(name = "lending_getUserSupplyWithInterest")]
+    fn get_user_supply_with_interest(
+        &self,
+        asset_id: AssetId, 
+        user: AccountId,
+        at: Option<BlockHash>
+    ) -> Result<Balance>;
+
 }
 
 /// A struct that implements the `SumStorageApi`.
@@ -118,5 +135,45 @@ where
             message: "Something wrong".into(),
             data: Some(format!("{:?}", e).into()),
         })  
+    }
+
+    fn get_user_debt_with_interest(
+        &self,
+        asset_id: AssetId, 
+        user: AccountId,
+        at: Option<<Block as BlockT>::Hash>
+    ) -> Result<Balance> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(||
+            // If the block hash is not supplied assume the best block.
+            self.client.info().best_hash
+        ));
+
+        let runtime_api_result = api.get_user_debt_with_interest(&at, asset_id, user);
+        runtime_api_result.map_err(|e| RpcError {
+            code: ErrorCode::ServerError(9876), // No real reason for this value
+            message: "Something wrong".into(),
+            data: Some(format!("{:?}", e).into()),
+        }) 
+    }
+
+    fn get_user_supply_with_interest(
+        &self,
+        asset_id: AssetId, 
+        user: AccountId,
+        at: Option<<Block as BlockT>::Hash>
+    ) -> Result<Balance> {
+        let api = self.client.runtime_api();
+        let at = BlockId::hash(at.unwrap_or_else(||
+            // If the block hash is not supplied assume the best block.
+            self.client.info().best_hash
+        ));
+
+        let runtime_api_result = api.get_user_supply_with_interest(&at, asset_id, user);
+        runtime_api_result.map_err(|e| RpcError {
+            code: ErrorCode::ServerError(9876), // No real reason for this value
+            message: "Something wrong".into(),
+            data: Some(format!("{:?}", e).into()),
+        }) 
     }
 }

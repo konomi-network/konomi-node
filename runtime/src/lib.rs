@@ -556,6 +556,15 @@ impl_runtime_apis! {
 			let (a, b, c) = Lending::get_user_info(user);
 			(a.saturated_into(), b.saturated_into(), c.saturated_into())
 		}
+
+		fn get_user_debt_with_interest(asset_id: AssetId, user: AccountId) -> Balance {
+			Lending::get_user_debt_with_interest(asset_id, user)
+		}
+
+		fn get_user_supply_with_interest(asset_id: AssetId, user: AccountId) -> Balance {
+			Lending::get_user_supply_with_interest(asset_id, user)
+		}
+
     }
 
 	#[cfg(feature = "runtime-benchmarks")]
