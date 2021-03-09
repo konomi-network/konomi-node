@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
+    debug,
     decl_event, decl_module, decl_storage, decl_error, ensure,
     StorageMap, Parameter,
 };
@@ -163,6 +164,7 @@ decl_module! {
             origin,
             asset_id: T::AssetId,
             amount: T::Balance) -> Result {
+            debug::info!("Entering supply");
             let account = ensure_signed(origin)?;
 
             // check pool exists and get pool instance
@@ -194,6 +196,7 @@ decl_module! {
             // commit pool change to storage
             Pools::<T>::insert(asset_id, pool);
 
+            debug::info!("Leaving supply");
             Ok(())
         }
 
@@ -202,6 +205,8 @@ decl_module! {
             origin,
             asset_id: T::AssetId,
             amount: T::Balance) -> Result {
+            debug::info!("Entering withdraw");
+
             let account = ensure_signed(origin)?;
 
             // check pool exists and get pool instance
@@ -253,6 +258,7 @@ decl_module! {
             // commit pool change to storage
             Pools::<T>::insert(asset_id, pool);
 
+            debug::info!("Leaving withdraw");
             Ok(())
         }
 
@@ -261,6 +267,7 @@ decl_module! {
             origin,
             asset_id: T::AssetId,
             amount: T::Balance) -> Result {
+            debug::info!("Entering borrow");
             let account = ensure_signed(origin)?;
 
             // check pool exists and get pool instance
@@ -306,6 +313,7 @@ decl_module! {
 
             // commit pool change to storage
             Pools::<T>::insert(asset_id, pool);
+            debug::info!("Leaving borrow");
 
             Ok(())
         }
@@ -315,6 +323,8 @@ decl_module! {
             origin,
             asset_id: T::AssetId,
             amount: T::Balance) -> Result {
+            debug::info!("Entering repay");
+
             let account = ensure_signed(origin)?;
 
             // check pool exists and get pool instance
@@ -352,6 +362,7 @@ decl_module! {
 
             // commit pool change to storage
             Pools::<T>::insert(asset_id, pool);
+            debug::info!("Leaving repay");
 
             Ok(())
         }
@@ -366,6 +377,7 @@ decl_module! {
             get_asset_id: T::AssetId,
             pay_asset_amount: T::Balance
         ) -> Result {
+            debug::info!("Entering liquidate");
             let account = ensure_signed(origin)?;
 
             // check pool exists and get pool instances
@@ -433,6 +445,8 @@ decl_module! {
             Pools::<T>::insert(get_asset_id, get_pool);
             Pools::<T>::insert(pay_asset_id, pay_pool);
 
+            debug::info!("Leaving liquidate");
+
             Ok(())
         }
         
@@ -460,7 +474,10 @@ impl<T: Trait> Module<T> where
     }
     
     fn accrue_interest(pool: &mut Pool<T>) {
+        debug::info!("Entering accrue_interest");
+
         if pool.last_updated == <frame_system::Module<T>>::block_number() {
+            debug::info!("Leaving accrue_interest");
             return
         }
 
@@ -481,10 +498,13 @@ impl<T: Trait> Module<T> where
         pool.total_debt_index = pool.total_debt_index * debt_multiplier;
 
         pool.last_updated = <frame_system::Module<T>>::block_number();
+        debug::info!("Leaving accrue_interest");
+
     }
 
     // amount is pre-checked so will no be negative
     fn update_user_supply(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
+        debug::info!("Entering update_user_supply");
         if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
 
             user_supply.amount = (pool.total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount);
@@ -512,11 +532,13 @@ impl<T: Trait> Module<T> where
             };
             UserSupplies::<T>::insert(asset_id, account, user_supply);
         }
+        debug::info!("Leaving update_user_supply");
 
     }
 
     // amount is pre-checked so will no be negative
     fn update_user_debt(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
+        debug::info!("Entering update_user_debt");
 
         if let Some(mut user_debt) = Self::user_debt(asset_id, account.clone()) {
             user_debt.amount = (pool.total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount);
@@ -544,22 +566,30 @@ impl<T: Trait> Module<T> where
             };
             UserDebts::<T>::insert(asset_id, account, user_debt);
         }
+        debug::info!("Leaving update_user_debt");
+
     }
 
     fn update_pool_supply(pool: &mut Pool<T>, amount: T::Balance, positive: bool) {
+        debug::info!("Entering update_pool_supply");
+
         if positive {
             pool.supply += amount;
         } else {
             pool.supply -= amount;
         }
+        debug::info!("Leaving update_pool_supply");
     }
 
     fn update_pool_debt(pool: &mut Pool<T>, amount: T::Balance, positive: bool) {
+        debug::info!("Entering update_pool_debt");
         if positive {
             pool.debt += amount;
         } else {
             pool.debt -= amount;
         }
+        debug::info!("Leaving update_pool_debt");
+
     }
 
     fn _init_pool(id: T::AssetId, can_be_collateral: bool) {
@@ -584,48 +614,71 @@ impl<T: Trait> Module<T> where
     }
 
     fn supply_rate_internal(pool: &Pool<T>) -> FixedU128 {
+        debug::info!("Entering supply_rate_internal");
+
         if pool.supply == T::Balance::zero() {
+            debug::info!("Leaving supply_rate_internal");
+
             return FixedU128::zero();
         } 
 
         let utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
+        debug::info!("Leaving supply_rate_internal");
         Self::debt_rate_internal(pool) * utilization_ratio
+
     }
 
     fn debt_rate_internal(pool: &Pool<T>) -> FixedU128 {
+        debug::info!("Entering debt_rate_internal");
+
         if pool.supply == T::Balance::zero() {
+            debug::info!("Leaving debt_rate_internal");
             return pool.initial_interest_rate;
         } 
 
         let utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
+        debug::info!("Leaving debt_rate_internal");
         pool.initial_interest_rate + pool.utilization_factor * utilization_ratio
+
     }
 
     /// runtime apis
     pub fn supply_rate(id: T::AssetId) -> FixedU128 {
+        debug::info!("Entering supply_rate");
+
         let pool = Self::pool(id);
         if pool.is_none() {
+            debug::info!("Leaving supply_rate");
+
             return FixedU128::zero()
         }
 
         let pool = pool.unwrap();
+        debug::info!("Leaving supply_rate");
 
         Self::supply_rate_internal(&pool)
+
     }
 
     pub fn debt_rate(id: T::AssetId) -> FixedU128 {
+        debug::info!("Entering debt_rate");
+
         let pool = Self::pool(id);
         if pool.is_none() {
+            debug::info!("Leaving debt_rate");
+
             return FixedU128::zero()
         }
 
         let pool = pool.unwrap();
+        debug::info!("Leaving debt_rate");
 
         Self::debt_rate_internal(&pool)
     }
 
     // total supply balance; total converted supply balance; total debt balance;
     pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance, T::Balance) {
+        debug::info!("Entering get_user_info");
         let mut supply_balance = T::Balance::zero();
         let mut supply_converted = T::Balance::zero();
         for asset in Self::user_supply_set(user.clone()).into_iter() {
@@ -642,12 +695,13 @@ impl<T: Trait> Module<T> where
             let price = T::Oracle::get_rate(asset);
             debt_balance += price.saturating_mul_int(amount);
         }
+        debug::info!("Leaving get_user_info");
 
         (supply_balance, supply_converted, debt_balance)
     }
 
     pub fn get_user_debt_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
-
+        debug::info!("Entering get_user_debt_with_interest");
         let total_debt_index;
 
         if let Some(pool) = Self::pool(asset_id) {
@@ -660,9 +714,11 @@ impl<T: Trait> Module<T> where
             total_debt_index = pool.total_debt_index * debt_multiplier;
 
         } else {
+            debug::info!("Leaving get_user_debt_with_interest");
             return T::Balance::zero()
         }
 
+        debug::info!("Leaving get_user_debt_with_interest");
         if let Some(user_debt) = Self::user_debt(asset_id, user) {
             (total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount)
         } else {
@@ -671,6 +727,7 @@ impl<T: Trait> Module<T> where
     }
 
     pub fn get_user_supply_with_interest(asset_id: T::AssetId, user: T::AccountId) -> T::Balance {
+        debug::info!("Entering get_user_supply_with_interest");
 
         let total_supply_index;
 
@@ -684,8 +741,10 @@ impl<T: Trait> Module<T> where
             total_supply_index = pool.total_supply_index * supply_multiplier;
 
         } else {
+            debug::info!("Leaving get_user_supply_with_interest");
             return T::Balance::zero()
         }
+        debug::info!("Leaving get_user_supply_with_interest");
 
         if let Some(user_supply) = Self::user_supply(asset_id, user) {
             (total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount)
@@ -696,22 +755,28 @@ impl<T: Trait> Module<T> where
 
     // pool interest is already accrued
     fn accrue_debt_with_interest(pool: &Pool<T>, asset_id: T::AssetId, user: T::AccountId) {
+        debug::info!("Entering accrue_debt_with_interest");
 
         if let Some(mut user_debt) = Self::user_debt(asset_id, user.clone()) {
             user_debt.amount = (pool.total_debt_index / user_debt.index).saturating_mul_int(user_debt.amount);
             user_debt.index = pool.total_debt_index;
             UserDebts::<T>::insert(asset_id, user, user_debt);
         } 
+        debug::info!("Leaving accrue_debt_with_interest");
+
     }
 
     // pool interest is already accrued
     fn accrue_supply_with_interest(pool: &Pool<T>, asset_id: T::AssetId, user: T::AccountId) {
+        debug::info!("Entering accrue_supply_with_interest");
 
         if let Some(mut user_supply) = Self::user_supply(asset_id, user.clone()) {
             user_supply.amount = (pool.total_supply_index / user_supply.index).saturating_mul_int(user_supply.amount);
             user_supply.index = pool.total_supply_index;
             UserSupplies::<T>::insert(asset_id, user, user_supply);
-        } 
+        }
+        debug::info!("Leaving accrue_supply_with_interest");
+
     }
 
 }
