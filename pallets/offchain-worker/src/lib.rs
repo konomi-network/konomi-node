@@ -74,8 +74,7 @@ decl_module! {
 		fn offchain_worker(block_number: T::BlockNumber) {
 			debug::native::info!("Hello World from offchain workers!");
 
-			let parent_hash = <system::Module<T>>::block_hash(block_number - 1u32.into());
-			debug::debug!("Current block: {:?} (parent hash: {:?})", block_number, parent_hash);
+			debug::debug!("Current block: {:?}", block_number);
 
 			let price = <assets::Module<T>>::price(<T as assets::Trait>::AssetId::from(4u32));
 			debug::debug!("Current price: {:?}", price);
