@@ -235,7 +235,7 @@ decl_module! {
             ensure!(Self::get_liquidation_threshold().saturating_mul_int(converted_borrow) <= converted_supply, Error::<T>::BelowLiquidationThreshold);
 
             // check pool cash = (deposit - borrow) > amount
-            if (pool.supply - pool.debt) <= amount {
+            if (pool.supply - pool.debt) < amount {
                 Err(Error::<T>::NotEnoughLiquidity)?
             }
 
