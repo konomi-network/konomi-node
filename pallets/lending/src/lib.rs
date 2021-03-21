@@ -18,6 +18,12 @@ use sp_std::{vec::Vec, convert::TryInto};
 use codec::{Encode, Decode};
 use traits::{Oracle, MultiAsset};
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 const PALLET_ID: ModuleId = ModuleId(*b"Lending!");
 
 /// The module's configuration trait.
@@ -33,7 +39,6 @@ pub trait Trait: frame_system::Trait {
 
     type MultiAsset: MultiAsset<Self::AccountId, Self::AssetId, Self::Balance>;
 }
-
 
 /// Pending atomic swap operation.
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]

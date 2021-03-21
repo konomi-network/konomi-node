@@ -26,6 +26,10 @@ sp-runtime = { default-features = false, version = '2.0.1' }
 pallet-assets = { path = '../assets', default-features = false, version = '2.0.1' }
 traits = { path = '../traits', default-features = false, version = '2.0.1'}
 
+[dev-dependencies]
+sp-io = '2.0.1'
+pallet-assets = { path = '../assets', version = '2.0.1' }
+
 [features]
 default = ['std']
 std = [

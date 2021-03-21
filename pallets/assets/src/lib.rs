@@ -156,7 +156,7 @@ decl_storage! {
                 <Module<T>>::_issue(account.clone(), amount.clone());
                 let to_account = <Owner<T>>::get();
                 let asset_id = <NextAssetId<T>>::get() - 1u32.into();
-                <Module<T>>::transfer(account.clone(), asset_id, to_account, 50000u32.into());
+                <Module<T>>::transfer(account.clone(), asset_id, to_account, 500000u32.into());
                 <Module<T>>::_set_price(asset_id, FixedU128::saturating_from_integer(*price));
             }
         })
