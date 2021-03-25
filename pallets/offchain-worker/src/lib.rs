@@ -112,7 +112,7 @@ impl<T: Trait> Module<T> {
 	fn fetch_price() -> Result<u32, http::Error> {
 		let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
 		let request = http::Request::get(
-			"https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD"
+			"http://localhost:8080/assets/prices"
 		);
 		let pending = request
 			.deadline(deadline)
@@ -127,12 +127,13 @@ impl<T: Trait> Module<T> {
 		}
 
 		let body = response.body().collect::<Vec<u8>>();
+		debug::warn!("BODY: {:?}", body);
 
 		let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
 			debug::warn!("No UTF8 body");
 			http::Error::Unknown
 		})?;
-
+		debug::warn!("BODY: {}", body_str);
 		let price = match Self::parse_price(body_str) {
 			Some(price) => Ok(price),
 			None => {
