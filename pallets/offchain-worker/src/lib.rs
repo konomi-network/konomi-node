@@ -152,6 +152,8 @@ impl<T: Trait> Module<T> {
 	/// Returns `None` when parsing failed or `Some(price in cents)` when parsing is successful.
 	fn parse_price(price_str: &str) -> Option<u32> {
 		let val = lite_json::parse_json(price_str);
+		debug::warn!("parsed json: {:?}", val);
+		debug::warn!("parsed json raw print: {}", val);
 		let price = val.ok().and_then(|v| match v {
 			JsonValue::Object(obj) => {
 				let mut chars = "USD".chars();
