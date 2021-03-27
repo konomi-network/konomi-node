@@ -75,6 +75,7 @@ impl Trait for Test {
 }
 
 pub type System = system::Module<Test>;
+pub type Assets = assets::Module<Test>;
 pub type Lending = Module<Test>;
 
 pub struct ExtBuilder {
