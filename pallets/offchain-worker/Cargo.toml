@@ -27,6 +27,7 @@ sp-std = { default-features = false, version = '2.0.1' }
 lite-json = { version = "0.1", default-features = false }
 pallet-assets = { path = '../assets', default-features = false, version = '2.0.1'}
 
+
 [features]
 default = ["std"]
 std = [

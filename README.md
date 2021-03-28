@@ -29,6 +29,7 @@ Once the development environment is set up, build the node. This command will bu
 
 ```bash
 cargo build --release
+cargo build --release -p konomi-runtime
 ```
 
 ## Run
@@ -45,4 +46,9 @@ Start a dev chain:
 
 ```bash
 ./target/release/konomi-node --dev
+```
+
+Start the UI
+```bash
+docker run --rm -it --name polkadot-ui -e WS_URL=ws://localhost:9944 -p 81:80 jacogr/polkadot-js-apps:latest
 ```

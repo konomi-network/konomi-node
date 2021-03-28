@@ -22,6 +22,7 @@ use sp_std::vec::Vec;
 use lite_json::json::JsonValue;
 use pallet_assets as assets;
 
+
 /// This pallet's configuration trait
 pub trait Trait: CreateSignedTransaction<Call<Self>> + assets::Trait {
 	/// The overarching event type.
@@ -54,19 +55,26 @@ decl_module! {
 		fn deposit_event() = default;
 
 		#[weight = 0]
-		pub fn submit_price_unsigned(origin, _block_number: T::BlockNumber, price: u32)
+		pub fn submit_price_unsigned(origin, _block_number: T::BlockNumber, prices: Vec<u32>)
 			-> DispatchResult
 		{
 			// This ensures that the function can only be called via unsigned transaction.
 			ensure_none(origin)?;
 			// Add the price to the on-chain list, but mark it as coming from an empty address.
-			let asset_id = <T as assets::Trait>::AssetId::from(4u32);
-			let price = FixedU128::saturating_from_rational(price, 100);
-			<assets::Module<T>>::_set_price(asset_id, price);
+
+			debug::info!("received prices from caller, ready to update prices");
+			// update all the prices
+			for (idx, price) in prices.iter().enumerate() {
+				debug::info!("price for asset {} is {}", idx, price);
+				let asset_id = <T as assets::Trait>::AssetId::from((idx as u32));
+				let price = FixedU128::saturating_from_rational(*price, 100);
+				<assets::Module<T>>::_set_price(asset_id, price);
+				Self::deposit_event(RawEvent::NewPrice(asset_id, price));
+			}
+
 			// now increment the block number at which we expect next unsigned transaction.
 			let current_block = <system::Module<T>>::block_number();
 			<NextUnsignedAt<T>>::put(current_block + T::UnsignedInterval::get());
-			Self::deposit_event(RawEvent::NewPrice(asset_id, price));
 
 			Ok(())
 		}
@@ -98,9 +106,9 @@ impl<T: Trait> Module<T> {
 			return Err("Too early to send unsigned transaction")
 		}
 
-		let price = Self::fetch_price().map_err(|_| "Failed to fetch price")?;
+		let prices = Self::fetch_price().map_err(|_| "Failed to fetch price")?;
 
-		let call = Call::submit_price_unsigned(block_number, price);
+		let call = Call::submit_price_unsigned(block_number, prices);
 
 		SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
 			.map_err(|()| "Unable to submit unsigned transaction.")?;
@@ -109,10 +117,10 @@ impl<T: Trait> Module<T> {
 	}
 
 	/// Fetch current price and return the result in cents.
-	fn fetch_price() -> Result<u32, http::Error> {
+	fn fetch_price() -> Result<Vec<u32>, http::Error> {
 		let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(2_000));
 		let request = http::Request::get(
-			"http://localhost:8080/assets/prices"
+			"http://node-helper.default:8080/assets/prices"
 		);
 		let pending = request
 			.deadline(deadline)
@@ -134,46 +142,32 @@ impl<T: Trait> Module<T> {
 			http::Error::Unknown
 		})?;
 		debug::warn!("BODY: {}", body_str);
-		let price = match Self::parse_price(body_str) {
-			Some(price) => Ok(price),
-			None => {
-				debug::warn!("Unable to extract price from the response: {:?}", body_str);
-				Err(http::Error::Unknown)
-			}
-		}?;
+		let prices = Self::parse_price(body_str);
+		if prices.len() == 0 {
+			debug::warn!("Unable to extract price from the response: {:?}", body_str);
+			return Err(http::Error::Unknown);
+		}
+		debug::warn!("Got price: {:?} cents", prices);
 
-		debug::warn!("Got price: {} cents", price);
-
-		Ok(price)
+		Ok(prices)
 	}
 
 	/// Parse the price from the given JSON string using `lite-json`.
 	///
 	/// Returns `None` when parsing failed or `Some(price in cents)` when parsing is successful.
-	fn parse_price(price_str: &str) -> Option<u32> {
-		let val = lite_json::parse_json(price_str);
-		debug::warn!("parsed json: {:?}", val);
-		debug::warn!("parsed json raw print: {}", val);
-		let price = val.ok().and_then(|v| match v {
-			JsonValue::Object(obj) => {
-				let mut chars = "USD".chars();
-				obj.into_iter()
-					.find(|(k, _)| k.iter().all(|k| Some(*k) == chars.next()))
-					.and_then(|v| match v.1 {
-						JsonValue::Number(number) => Some(number),
-						_ => None,
-					})
-			},
-			_ => None
-		})?;
-
-		let exp = price.fraction_length.checked_sub(2).unwrap_or(0);
-		Some(price.integer as u32 * 100 + (price.fraction / 10_u64.pow(exp)) as u32)
+	fn parse_price(price_str: &str) -> Vec<u32> {
+		let components = price_str.split(",");
+		let mut prices: Vec<u32> = Vec::new();
+		for s in components {
+			prices.push(s.parse().unwrap());
+		}
+		debug::info!("prices are {:?}", prices);
+		return prices;
 	}
 
 	fn validate_transaction_parameters(
 		block_number: &T::BlockNumber,
-		new_price: &u32,
+		new_price: &Vec<u32>,
 	) -> TransactionValidity {
 		// Now let's check if the transaction has any chance to succeed.
 		let next_unsigned_at = <NextUnsignedAt<T>>::get();
