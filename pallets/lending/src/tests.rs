@@ -12,15 +12,38 @@ fn new_test_ext() -> sp_io::TestExternalities {
 	ext
 }
 
+///  Under current configuration, user 1 has 1000000000000000000 - 500000 of every assets and user 2 has 500000 of every assets
+///  Inital price of asset 0 is 100, 1 is 60
+///  TODO: need to make this easier
 #[test]
 fn can_supply() {
 	new_test_ext().execute_with(|| {
+
+		let user_balance_before = Assets::get_asset_balance((0, 1));
 
 		assert_ok!(Lending::supply(
 			Origin::signed(1),
 			0,
 			100000,
 		));
+
+		let user_supply = Lending::user_supply(0, 1).unwrap();
+
+		assert_eq!(user_supply.amount, 100000);
+		assert_eq!(user_supply.index, FixedU128::one());
+
+		let pool_supply = Lending::pool(0).unwrap();
+
+		assert_eq!(pool_supply.supply, 100000);
+		assert_eq!(pool_supply.total_supply_index, FixedU128::one());
+		assert_eq!(pool_supply.last_updated, System::block_number());
+
+		let user_supply_set = Lending::user_supply_set(1);
+		assert_eq!(user_supply_set, vec![0]);
+
+		let user_balance_after = Assets::get_asset_balance((0, 1));
+		assert_eq!(user_balance_before - user_balance_after, 100000);
+
     });
 }
 
