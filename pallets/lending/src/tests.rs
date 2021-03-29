@@ -29,7 +29,7 @@ fn can_supply() {
 
 		assert_ok!(Lending::supply(
 			Origin::signed(user1),
-			0,
+			asset1,
 			100000,
 		));
 
@@ -57,23 +57,40 @@ fn can_supply() {
 fn can_borrow() {
 	new_test_ext().execute_with(|| {
 
+		System::set_block_number(1);
+
 		assert_ok!(Lending::supply(
-			Origin::signed(1),
-			0,
+			Origin::signed(user1),
+			asset1,
 			100000,
 		));
 
         assert_ok!(Lending::supply(
-			Origin::signed(2),
-			1,
+			Origin::signed(user2),
+			asset2,
 			100000,
 		));
 
         assert_ok!(Lending::borrow(
-			Origin::signed(2),
-			0,
+			Origin::signed(user2),
+			asset1,
 			10000,
 		));
+
+
+		System::set_block_number(100000);
+
+		// update the index
+		assert_ok!(Lending::supply(
+			Origin::signed(user1),
+			asset1,
+			1,
+		));
+
+		let user1_supply = Lending::user_supply(asset1, user1).unwrap();
+
+		assert!(user1_supply.amount > 100001);
+		assert!(user1_supply.index > FixedU128::one());
 
     });
 }
