@@ -156,6 +156,12 @@ impl<T: Trait> Module<T> {
 	///
 	/// Returns `None` when parsing failed or `Some(price in cents)` when parsing is successful.
 	fn parse_price(price_str: &str) -> Vec<u32> {
+		// The prices are delimited by ','.
+		// As an example, 230,450,...
+		// Each price is already multiplied by 100, if the actual price is $230.10, then
+		//    when it reaches this point, the price string is 23010
+		// Let's say the prices are KONO: $4.05, DOT: $35.40, ...
+		// Then the 'price_str' variable would be 405,3540,...
 		let components = price_str.split(",");
 		let mut prices: Vec<u32> = Vec::new();
 		for s in components {
