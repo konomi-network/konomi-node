@@ -34,7 +34,7 @@ pub trait LendingApi<BlockHash, AssetId, FixedU128, AccountId, Balance> {
         &self,
         user: AccountId,
         at: Option<BlockHash>
-    ) -> Result<(u64, u64, u64)>;
+    ) -> Result<(FixedU128, FixedU128, FixedU128)>;
 
     #[rpc(name = "lending_getUserDebtWithInterest")]
     fn get_user_debt_with_interest(
@@ -122,7 +122,7 @@ where
         &self,
         user: AccountId,
         at: Option<<Block as BlockT>::Hash>
-    ) -> Result<(u64, u64, u64)> {
+    ) -> Result<(FixedU128, FixedU128, FixedU128)> {
         let api = self.client.runtime_api();
         let at = BlockId::hash(at.unwrap_or_else(||
             // If the block hash is not supplied assume the best block.
