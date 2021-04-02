@@ -97,7 +97,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("konomi-node"),
 	impl_name: create_runtime_str!("konomi-node"),
 	authoring_version: 1,
-	spec_version: 5,
+	spec_version: 6,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -552,7 +552,7 @@ impl_runtime_apis! {
             Lending::debt_rate(id)
 		}
 		
-		fn get_user_info(user: AccountId) -> (FixedU128, FixedU128, FixedU128) {
+		fn get_user_info(user: AccountId) -> (u64, u64, u64) {
 			let (a, b, c) = Lending::get_user_info(user);
 			(a.saturated_into(), b.saturated_into(), c.saturated_into())
 		}

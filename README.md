@@ -52,3 +52,9 @@ Start the UI
 ```bash
 docker run --rm -it --name polkadot-ui -e WS_URL=ws://localhost:9944 -p 81:80 jacogr/polkadot-js-apps:latest
 ```
+
+Start the validator
+```bash
+docker run parity/rococo:rococo-v1-0.8.29-f0d5c3d5-71c1c42c --validator --chain rococo --name "konomi-test-01"
+docker pull parity/rococo:
+```
