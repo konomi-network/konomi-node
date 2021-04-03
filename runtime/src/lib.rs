@@ -602,3 +602,5 @@ impl_runtime_apis! {
 		}
 	}
 }
+
+cumulus_pallet_parachain_system::register_validate_block!(Runtime, Executive);
