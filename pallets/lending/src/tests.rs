@@ -50,7 +50,44 @@ fn can_supply() {
 		let user_balance_after = Assets::get_asset_balance((asset1, user1));
 		assert_eq!(user_balance_before - user_balance_after, 100000);
 
-    });
+	});
+}
+
+#[test]
+fn accrue_interest() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		// setup pool
+		let first_asset = 0;
+		let first_asset_amount = 100000;
+		let first_price = 1.25;
+		let second_asset = 1;
+		let second_asset_amount = 100000;
+		let second_price = 2.5;
+		let borrow: u128 = 100;
+
+		Assets::set_price(Origin::signed(user1), first_asset, FixedU128::from_fraction(first_price));
+		Assets::set_price(Origin::signed(user1), second_asset, FixedU128::from_fraction(second_price));
+
+		Lending::supply(Origin::signed(user1), first_asset, first_asset_amount);
+		Lending::supply(Origin::signed(user1), second_asset, second_asset_amount);
+
+		System::set_block_number(11);
+		Lending::supply(Origin::signed(user2), second_asset, second_asset_amount);
+		Lending::borrow(Origin::signed(user2), first_asset, borrow);
+
+		System::set_block_number(21);
+		let snapshot = Lending::pool(first_asset).unwrap();
+
+		Lending::supply(Origin::signed(user2), second_asset, second_asset_amount);
+		Lending::borrow(Origin::signed(user2), first_asset, borrow);
+
+		let total = Lending::pool(first_asset).unwrap();
+
+		assert!(snapshot.debt + borrow < total.debt);
+
+	});
 }
 
 #[test]
@@ -59,19 +96,31 @@ fn can_borrow() {
 
 		System::set_block_number(1);
 
-		assert_ok!(Lending::supply(
-			Origin::signed(user1),
-			asset1,
-			100000,
-		));
+		// setup pool
+		let first_asset = 0;
+		let first_asset_amount = 100000;
+		let first_price: FixedU128 = FixedU128::from_fraction(1.25);
+		let second_asset = 1;
+		let second_asset_amount = 100000;
+		let second_price: FixedU128 = FixedU128::from_fraction(2.5);
 
-        assert_ok!(Lending::supply(
+		Assets::set_price(Origin::signed(user1), first_asset, first_price);
+		Assets::set_price(Origin::signed(user1), second_asset, second_price);
+
+		assert_ok!(Lending::supply(Origin::signed(user1), first_asset, first_asset_amount));
+		Lending::supply(Origin::signed(user1), second_asset, second_asset_amount);
+		Lending::supply(Origin::signed(user2), second_asset, second_asset_amount);
+
+		let second_total = Lending::pool(second_asset).unwrap();
+
+
+		assert_ok!(Lending::supply(
 			Origin::signed(user2),
 			asset2,
 			100000,
 		));
 
-        assert_ok!(Lending::borrow(
+		assert_ok!(Lending::borrow(
 			Origin::signed(user2),
 			asset1,
 			10000,
@@ -92,26 +141,25 @@ fn can_borrow() {
 		assert!(user1_supply.amount > 100001);
 		assert!(user1_supply.index > FixedU128::one());
 
-    });
+	});
 }
 
 #[test]
 fn can_repay() {
 	new_test_ext().execute_with(|| {
+		// setup pools
+		assert_ok!(Lending::supply(Origin::signed(1),0,100000));
+		assert_ok!(Lending::supply(Origin::signed(1),1,100000));
+		assert_ok!(Lending::supply(Origin::signed(2),1,100000));
+
 
 		assert_ok!(Lending::supply(
-			Origin::signed(1),
-			0,
-			100000,
-		));
-
-        assert_ok!(Lending::supply(
 			Origin::signed(2),
 			1,
 			100000,
 		));
 
-        assert_ok!(Lending::borrow(
+		assert_ok!(Lending::borrow(
 			Origin::signed(2),
 			0,
 			10000,
@@ -123,7 +171,7 @@ fn can_repay() {
 			10000,
 		));
 
-    });
+	});
 }
 
 #[test]
@@ -136,13 +184,13 @@ fn can_withdraw() {
 			100000,
 		));
 
-        assert_ok!(Lending::supply(
+		assert_ok!(Lending::supply(
 			Origin::signed(2),
 			1,
 			100000,
 		));
 
-        assert_ok!(Lending::borrow(
+		assert_ok!(Lending::borrow(
 			Origin::signed(2),
 			0,
 			10000,
@@ -154,7 +202,7 @@ fn can_withdraw() {
 			50000,
 		));
 
-    });
+	});
 }
 
 #[test]
@@ -167,13 +215,13 @@ fn can_liquidate() {
 			100000,
 		));
 
-        assert_ok!(Lending::supply(
+		assert_ok!(Lending::supply(
 			Origin::signed(2),
 			1,
 			100000,
 		));
 
-        assert_ok!(Lending::borrow(
+		assert_ok!(Lending::borrow(
 			Origin::signed(2),
 			0,
 			10000,
@@ -185,7 +233,7 @@ fn can_liquidate() {
 			FixedU128::saturating_from_integer(5),
 		));
 
-        assert_ok!(Lending::liquidate(
+		assert_ok!(Lending::liquidate(
 			Origin::signed(1),
 			2,
 			0,
@@ -194,5 +242,5 @@ fn can_liquidate() {
 		));
 
 
-    });
+	});
 }
