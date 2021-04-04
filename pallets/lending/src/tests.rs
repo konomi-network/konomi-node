@@ -58,14 +58,19 @@ fn accrue_interest() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 
+		let one: u128 = 1000000000000000000;
+
 		// setup pool
 		let first_asset = 0;
-		let first_asset_amount = 100000;
+		let first_asset_amount = 100 * one;
 		let first_price = 1.25;
 		let second_asset = 1;
-		let second_asset_amount = 100000;
+
+		// 100u
+		let second_asset_amount = 100 * one;
 		let second_price = 2.5;
-		let borrow: u128 = 100;
+		// 1 u
+		let borrow: u128 = one;
 
 		Assets::set_price(Origin::signed(user1), first_asset, FixedU128::from_fraction(first_price));
 		Assets::set_price(Origin::signed(user1), second_asset, FixedU128::from_fraction(second_price));
