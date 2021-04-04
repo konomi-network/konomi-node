@@ -629,8 +629,9 @@ impl<T: Trait> Module<T> where
 
         let utilization_ratio = FixedU128::saturating_from_rational(pool.debt, pool.supply);
         debug::info!("Leaving supply_rate_internal");
-        Self::debt_rate_internal(pool) * utilization_ratio
-
+        let debt_rate = Self::debt_rate_internal(pool);
+        let supply_rate = debt_rate * utilization_ratio;
+        return supply_rate;
     }
 
     fn debt_rate_internal(pool: &Pool<T>) -> FixedU128 {
