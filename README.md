@@ -139,6 +139,7 @@ Once the development environment is set up, build the node. This command will bu
 
 ```bash
 cargo build --release
+cargo build --release -p konomi-runtime
 ```
 
 ## Run
