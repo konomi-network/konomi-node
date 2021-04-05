@@ -32,58 +32,61 @@ pub trait Trait: frame_system::Trait {
     type Balance: Member + Parameter + FixedPointOperand + AtLeast32BitUnsigned + Default + Copy;
     /// The arithmetic type of asset identifier.
     type AssetId: Parameter + AtLeast32BitUnsigned + Default + Copy;
-
+	/// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-
+    /// Price oracle for assets.
     type Oracle: Oracle<Self::AssetId, FixedU128>;
-
+    /// Multiple transferrable assets.
     type MultiAsset: MultiAsset<Self::AccountId, Self::AssetId, Self::Balance>;
 }
 
-/// Pending atomic swap operation.
+/// Pool information
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct Pool<T: Trait> {
+    /// If the pool is enabled
     pub enabled: bool,
-
+    /// If the asset can be enabled as collateral
     pub can_be_collateral: bool,
-
+    /// The underlying asset
 	pub asset: T::AssetId,
-
+    /// Total supply of the pool
 	pub supply: T::Balance,
-
+    /// Total debt of the pool
     pub debt: T::Balance,
-
+    /// A discount factor for an asset that reduces the its limit
     pub safe_factor: FixedU128,
-
-    pub close_factor: FixedU128, // < 1
-
+    /// Factor that determines what percentage one arbitrage can seize, <=1
+    pub close_factor: FixedU128,
+    /// The bonus arbitrager can get when triggering a liquidation
     pub discount_factor: FixedU128,
-
+    /// Effective index of current total supply
     pub total_supply_index: FixedU128,
-
+    /// Effective index of current total debt
     pub total_debt_index: FixedU128,
-
+    /// The latest timestamp that the pool has accrued interest
     pub last_updated: T::BlockNumber,
-
+    /// One factor of the linear interest model
     pub utilization_factor: FixedU128,
-
+    /// Another factor of the linear interest model
     pub initial_interest_rate: FixedU128,
     
 }
 
+/// User supply information of a given pool
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserSupply<T: Trait> {
-	/// Source of the swap.
+	/// Supply amount at index
 	pub amount: T::Balance,
-	/// Action of this swap.
+	/// Supply index
     pub index: FixedU128,
 }
 
+/// User debt information of a given pool
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode)]
 pub struct UserDebt<T: Trait> {
-	/// Source of the swap.
+	/// Debt amount at index
 	pub amount: T::Balance,
-	/// Action of this swap.
+	/// Debt index
 	pub index: FixedU128,
 }
 
@@ -92,38 +95,38 @@ decl_event!(
     <T as system::Trait>::AccountId,
     <T as Trait>::Balance,
     <T as Trait>::AssetId {
-
+        /// Some asset supplied to a pool \[asset_id, user, amount\]
         Supplied(AssetId, AccountId, Balance),
-
+        /// Some asset withdrawn from a pool \[asset_id, user, amount\]
         Withdrawn(AssetId, AccountId, Balance),
-
+        /// Some asset borrow from a pool \[asset_id, user, amount\]
         Borrowed(AssetId, AccountId, Balance),
-
+        /// Some asset repaid to a pool \[asset_id, user, amount\]
         Repaid(AssetId, AccountId, Balance),
-
+        /// Some asset liquidated \[pay_asset_id, seized_asset_id, arbitrager, target, amount_pay_asset, amount_seized_asset\]
         Liquidated(AssetId, AssetId, AccountId, AccountId, Balance, Balance),
-
     }
 );
 
-// This module's storage items.
 decl_storage! {
     trait Store for Module<T: Trait> as Lending
     {
+        /// A double map of user's debt
         pub UserDebts get(fn user_debt): double_map
             hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
             => Option<UserDebt<T>>;
-
+        /// A double map of user's supply
         pub UserSupplies get(fn user_supply): double_map
             hasher(twox_64_concat) T::AssetId, hasher(blake2_128_concat) T::AccountId
             => Option<UserSupply<T>>;
-
+        /// Information of all existing pools
         pub Pools get(fn pool): map hasher(twox_64_concat) T::AssetId => Option<Pool<T>>;
-
         // TODO: use bit set
+        /// The set of user's supply
         pub UserSupplySet get(fn user_supply_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
+        /// The set of user's debt
         pub UserDebtSet get(fn user_debt_set): map hasher(blake2_128_concat) T::AccountId => Vec<T::AssetId>;
-
+        /// The threshold of liquidation
         pub LiquidationThreshold get(fn get_liquidation_threshold): FixedU128 = FixedU128::one();
     }
 
@@ -141,15 +144,21 @@ decl_storage! {
 
 decl_error! {
 	pub enum Error for Module<T: Trait> {
+        /// Asset transfer failed
         TransferFailed,
+        /// Over borrowed and no liquidity for withdraw or borrow
         NotEnoughLiquidity,
-        InsufficientCollateral,
+        /// Pool is not established yet
         PoolNotExist,
+        /// Asset is not enabled as collateral
         AssetNotCollateral,
-        UserNotExist,
+        /// Try to liquidate while still above liquidation threshold
         AboveLiquidationThreshold,
+        /// Any actions resulting not enough collaterals
         BelowLiquidationThreshold,
+        /// User have no supply yet
         UserNoSupply,
+        /// User have no debt yet
         UserNoDebt, 
 	}
 }
@@ -164,6 +173,10 @@ decl_module! {
 
         // end user related
  
+        /// Supply an asset to the pool
+		///
+		/// - `asset_id`: The asset that user wants to supply
+		/// - `amount`: The amount that user wants to supply
         #[weight = 1]
         fn supply(
             origin,
@@ -205,6 +218,10 @@ decl_module! {
             Ok(())
         }
 
+        /// Withdraw an asset from the pool
+		///
+		/// - `asset_id`: The asset that user wants to withdraw
+		/// - `amount`: The amount that user wants to withdraw
         #[weight = 1]
         fn withdraw(
             origin,
@@ -267,6 +284,10 @@ decl_module! {
             Ok(())
         }
 
+        /// Borrow an asset from the pool
+		///
+		/// - `asset_id`: The asset that user wants to borrow
+		/// - `amount`: The amount that user wants to borrow
         #[weight = 1]
         fn borrow(
             origin,
@@ -323,6 +344,10 @@ decl_module! {
             Ok(())
         }
 
+        /// Repay an asset to the pool
+		///
+		/// - `asset_id`: The asset that user wants to repay
+		/// - `amount`: The amount that user wants to repay
         #[weight = 1]
         fn repay(
             origin,
@@ -374,6 +399,12 @@ decl_module! {
 
         // arbitrager related
 
+        /// liquidate an asset by paying target user's debt under liquidation threshold
+		///
+		/// - `target_user`: Target user whose asset to seize
+		/// - `pay_asset_id`: The asset to repay for the target user
+		/// - `get_asset_id`: The asset to seize
+		/// - `pay_asset_amount`: Amount of debt to pay for target user
         #[weight = 1]
         fn liquidate(
             origin,
@@ -507,7 +538,7 @@ impl<T: Trait> Module<T> where
 
     }
 
-    // amount is pre-checked so will no be negative
+    /// amount is pre-checked so will no be negative
     fn update_user_supply(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
         debug::info!("Entering update_user_supply");
         if let Some(mut user_supply) = Self::user_supply(asset_id, account.clone()) {
@@ -541,7 +572,7 @@ impl<T: Trait> Module<T> where
 
     }
 
-    // amount is pre-checked so will no be negative
+    /// amount is pre-checked so will no be negative
     fn update_user_debt(pool: &Pool<T>, asset_id: T::AssetId, account: T::AccountId, amount: T::Balance, positive: bool) {
         debug::info!("Entering update_user_debt");
 
@@ -648,6 +679,7 @@ impl<T: Trait> Module<T> where
     }
 
     /// runtime apis
+
     pub fn supply_rate(id: T::AssetId) -> FixedU128 {
         debug::info!("Entering supply_rate");
 
@@ -681,7 +713,7 @@ impl<T: Trait> Module<T> where
         Self::debt_rate_internal(&pool)
     }
 
-    // total supply balance; total converted supply balance; total debt balance;
+    /// total supply balance; total converted supply balance; total debt balance;
     pub fn get_user_info(user: T::AccountId) -> (T::Balance, T::Balance, T::Balance) {
         debug::info!("Entering get_user_info");
         let mut supply_balance = T::Balance::zero();
